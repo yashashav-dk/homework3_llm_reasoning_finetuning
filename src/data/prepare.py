@@ -113,113 +113,77 @@ def _has_roman_numeral_context(prompt: str) -> bool:
 # Main classifier
 # ---------------------------------------------------------------------------
 
+def _count_equation_examples(prompt: str) -> int:
+    """Count example lines containing '=' in a transformation-rules prompt."""
+    count = 0
+    for line in prompt.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # Skip the question line and header lines
+        if 'now,' in line.lower() or 'determine' in line.lower():
+            continue
+        if 'wonderland' in line.lower() or 'transformation' in line.lower():
+            continue
+        if '=' in line:
+            count += 1
+    return count
+
+
 def classify_puzzle(prompt: str, answer: str) -> str:
     """
     Classify a puzzle into one of the defined categories.
 
-    Parameters
-    ----------
-    prompt : str
-        The puzzle prompt text.
-    answer : str
-        The expected answer string.
-
-    Returns
-    -------
-    str
-        One of: numeral, gravity, unit_conversion, cipher, bit_manipulation,
-        equation_numeric_deduce, equation_numeric_guess,
-        cryptarithm_deduce, cryptarithm_guess.
+    Uses clear text markers from the competition prompts:
+    - "bit manipulation rule" → bit_manipulation
+    - "gravitational constant" → gravity
+    - "unit conversion" → unit_conversion
+    - "numeral system" → numeral
+    - "encryption rules" → cipher
+    - "transformation rules is applied to equations" → equation or cryptarithm
     """
-    answer_stripped = answer.strip()
+    # All prompts start with "In Alice's Wonderland, a secret ..." with
+    # clear category indicators in the prompt text.
 
-    # ------------------------------------------------------------------
-    # 1. bit_manipulation — 8-bit binary strings
-    # ------------------------------------------------------------------
-    if _BINARY8_STRICT_RE.fullmatch(answer_stripped) or re.fullmatch(r'[01]{8}', answer_stripped):
-        # Confirm prompt also has binary-looking content
-        if _count_binary8_tokens(prompt) >= 1:
-            return 'bit_manipulation'
-
-    # Check prompt heavily loaded with 8-bit binary tokens even if answer
-    # doesn't look binary (edge case safety net)
-    if _count_binary8_tokens(prompt) >= 3:
+    if 'bit manipulation' in prompt:
         return 'bit_manipulation'
 
-    # ------------------------------------------------------------------
-    # 2. numeral — Roman numeral conversion
-    # ------------------------------------------------------------------
-    if _has_roman_numeral_context(prompt):
-        return 'numeral'
-
-    # Answer is a pure Roman numeral string
-    if _is_roman(answer_stripped) and len(answer_stripped) >= 1:
-        return 'numeral'
-
-    # Answer is a plain number 1-100 AND prompt has Roman context (secondary check)
-    if _NUMBER_1_100_RE.match(answer_stripped):
-        num = int(answer_stripped.strip())
-        if 1 <= num <= 100 and _has_roman_numeral_context(prompt):
-            return 'numeral'
-
-    # ------------------------------------------------------------------
-    # 3. gravity — physics d = 0.5 * g * t^2
-    # ------------------------------------------------------------------
-    if _has_time_distance_context(prompt):
+    if 'gravitational' in prompt:
         return 'gravity'
 
-    # ------------------------------------------------------------------
-    # 4. unit_conversion — linear scaling
-    # ------------------------------------------------------------------
-    if _has_unit_conversion_context(prompt):
-        # Require some numeric pairs as evidence
-        if _count_numeric_io_pairs(prompt) >= 1:
-            return 'unit_conversion'
-
-    # ------------------------------------------------------------------
-    # 5. cipher — substitution cipher on text/words
-    # ------------------------------------------------------------------
-    if _has_cipher_context(prompt):
-        return 'cipher'
-
-    # Word→word pairs without obvious arithmetic → likely cipher
-    word_pairs = _count_word_pairs(prompt)
-    if word_pairs >= 2 and not re.search(r'\d', answer_stripped):
-        return 'cipher'
-
-    # ------------------------------------------------------------------
-    # 6. cryptarithm — letter-to-digit substitution arithmetic
-    # ------------------------------------------------------------------
-    letter_assignments = _count_letter_digit_pairs(prompt)
-    letter_equations = _count_arithmetic_equations_with_letters(prompt)
-
-    if letter_equations >= 1 or letter_assignments >= 3:
-        # Distinguish deduce vs guess by number of constraints
-        if letter_assignments >= 3 or letter_equations >= 2:
-            return 'cryptarithm_deduce'
-        return 'cryptarithm_guess'
-
-    # ------------------------------------------------------------------
-    # 7. equation_numeric — arithmetic operator discovery
-    # ------------------------------------------------------------------
-    numeric_pairs = _count_numeric_io_pairs(prompt)
-
-    if numeric_pairs >= 1:
-        if numeric_pairs >= 3:
-            return 'equation_numeric_deduce'
-        return 'equation_numeric_guess'
-
-    # ------------------------------------------------------------------
-    # Fallback: try unit_conversion even without confirmed pairs
-    # ------------------------------------------------------------------
-    if _has_unit_conversion_context(prompt):
+    if 'unit conversion' in prompt:
         return 'unit_conversion'
 
-    # Default: if answer is all digits, treat as equation guess
-    if re.fullmatch(r'-?\d+(?:\.\d+)?', answer_stripped):
-        return 'equation_numeric_guess'
+    if 'numeral system' in prompt or 'numeral' in prompt.lower():
+        return 'numeral'
 
-    # Last resort: cipher (unrecognised text transformation)
+    if 'encryption rules' in prompt:
+        return 'cipher'
+
+    if 'transformation rules' in prompt and 'equations' in prompt:
+        # Split into equation (numeric answer) vs cryptarithm (symbol answer)
+        answer_stripped = answer.strip()
+        is_numeric = bool(re.fullmatch(r'-?\d+(?:\.\d+)?', answer_stripped))
+
+        # Count examples to split deduce vs guess
+        n_examples = _count_equation_examples(prompt)
+
+        if is_numeric:
+            if n_examples >= 4:
+                return 'equation_numeric_deduce'
+            return 'equation_numeric_guess'
+        else:
+            if n_examples >= 4:
+                return 'cryptarithm_deduce'
+            return 'cryptarithm_guess'
+
+    # Fallback heuristics for any edge cases
+    answer_stripped = answer.strip()
+    if re.fullmatch(r'[01]{8}', answer_stripped):
+        return 'bit_manipulation'
+    if _is_roman(answer_stripped):
+        return 'numeral'
+
     return 'cipher'
 
 

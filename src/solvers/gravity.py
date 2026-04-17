@@ -20,9 +20,9 @@ class GravitySolver(BaseSolver):
     #   "t = 2, d = 8.00"
     #   "time=2 distance=8"
     _EXAMPLE_PATTERN = re.compile(
-        r"(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)"
+        r"(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)s?"
         r".*?"
-        r"(?:distance\s*(?:is|=)\s*|d\s*=\s*)([0-9]+(?:\.[0-9]+)?)",
+        r"(?:distance\s*(?:is|=)\s*|d\s*=\s*)([0-9]+(?:\.[0-9]+)?)\s*m?",
         re.IGNORECASE,
     )
 
@@ -33,15 +33,15 @@ class GravitySolver(BaseSolver):
     #   "find the distance when t = 5"
     #   "when time is 5, what is the distance?"
     _TARGET_PATTERN = re.compile(
-        r"(?:what\b|find\b)"
+        r"(?:determine|what\b|find\b)"
         r".*?"
-        r"(?:when\s+)?(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)",
+        r"(?:for\s+|when\s+)?(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)s?",
         re.IGNORECASE,
     )
 
-    # Looser fallback: "when time is X" anywhere in a question-like tail
+    # Looser fallback: "for t = X" or "when time is X" anywhere
     _WHEN_PATTERN = re.compile(
-        r"when\s+(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)",
+        r"(?:for|when)\s+(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)s?",
         re.IGNORECASE,
     )
 
@@ -51,11 +51,18 @@ class GravitySolver(BaseSolver):
         ground_truth: str = puzzle.get("answer", "")
 
         # --- Parse example pairs ---
+        # Split into lines and only match example lines (not the question line)
         example_pairs: list[tuple[float, float]] = []
-        for m in self._EXAMPLE_PATTERN.finditer(prompt):
-            t = float(m.group(1))
-            d = float(m.group(2))
-            example_pairs.append((t, d))
+        for line in prompt.split('\n'):
+            # Skip the question line (contains "determine", "what", "find", "Now")
+            line_lower = line.lower().strip()
+            if any(kw in line_lower for kw in ['now,', 'determine', 'what', 'find', 'given']):
+                continue
+            m = self._EXAMPLE_PATTERN.search(line)
+            if m:
+                t = float(m.group(1))
+                d = float(m.group(2))
+                example_pairs.append((t, d))
 
         if not example_pairs:
             return SolverResult(
@@ -108,7 +115,7 @@ class GravitySolver(BaseSolver):
                     last_example_end = m.end()
                 tail = prompt[last_example_end:]
                 tail_match = re.search(
-                    r"(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)",
+                    r"(?:time\s*(?:is|=)\s*|t\s*=\s*)([0-9]+(?:\.[0-9]+)?)s?",
                     tail,
                     re.IGNORECASE,
                 )

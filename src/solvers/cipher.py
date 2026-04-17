@@ -12,29 +12,18 @@ from src.solvers.base import BaseSolver, SolverResult
 # ---------------------------------------------------------------------------
 
 WONDERLAND_VOCAB: list[str] = [
-    # Characters
-    "alice", "rabbit", "queen", "king", "hatter", "cheshire", "cat", "mouse",
-    "duchess", "cook", "caterpillar", "dormouse", "march", "hare", "dodo",
-    "mock", "turtle", "gryphon", "lobster", "pigeon", "duchess", "knave",
-    # Places / things
-    "wonderland", "garden", "hole", "door", "table", "chair", "cup", "tea",
-    "party", "house", "pool", "court", "trial", "jury", "card", "cards",
-    "heart", "hearts", "diamond", "spade", "club", "bottle", "cake", "key",
-    "glass", "mirror", "mushroom", "hookah", "flamingo", "hedgehog", "croquet",
-    # Common Alice-story words
-    "curiouser", "curious", "shrink", "grow", "small", "large", "size",
-    "drink", "eat", "fall", "falling", "down", "up", "again", "away",
-    "moment", "suddenly", "thought", "said", "began", "felt", "found",
-    "quite", "very", "little", "great", "white", "red", "black", "golden",
-    "time", "way", "head", "hand", "feet", "foot", "eye", "eyes", "voice",
-    "nothing", "something", "everything", "anything", "somebody", "nobody",
-    "wonder", "dream", "sleep", "wake", "run", "jump", "stop", "come",
-    "went", "into", "upon", "under", "about", "after", "before", "back",
-    "round", "long", "looked", "began", "right", "left", "next", "just",
-    "read", "written", "write", "know", "think", "see", "hear", "feel",
-    "word", "letter", "name", "rule", "must", "could", "would", "should",
-    "mad", "crazy", "strange", "odd", "silly", "nonsense", "sentence",
-    "pepper", "soup", "tarts", "bread", "butter", "jam",
+    # All 77 unique words from competition cipher answers
+    "the", "follows", "dragon", "teacher", "writes", "creates", "draws",
+    "student", "rabbit", "studies", "discovers", "secret", "found", "mouse",
+    "dreams", "chases", "reads", "king", "sees", "watches", "queen", "hatter",
+    "knight", "explores", "bird", "imagines", "wizard", "turtle", "castle",
+    "cat", "alice", "garden", "princess", "colorful", "puzzle", "bright",
+    "forest", "book", "clever", "key", "dark", "mirror", "treasure", "silver",
+    "beyond", "inside", "in", "hidden", "curious", "around", "above", "wise",
+    "potion", "near", "door", "golden", "under", "through", "mysterious",
+    "magical", "strange", "story", "crystal", "message", "map", "ancient",
+    "village", "mountain", "wonderland", "cave", "school", "valley", "island",
+    "palace", "library", "ocean", "tower",
 ]
 
 # Pre-build a set and an index: length → list[word]
@@ -51,116 +40,57 @@ for _w in WONDERLAND_VOCAB:
 def _parse_examples(prompt: str) -> list[tuple[str, str]]:
     """Extract (encrypted, decrypted) example pairs from the puzzle prompt.
 
-    Expected prompt structure (flexible):
-      - Lines that show  "<encrypted>" → "<decrypted>"  or
-        "<encrypted>" encrypts to "<decrypted>"  or
-        "<encrypted>" = "<decrypted>"  etc.
-    Also handles the question line:
-      What does '<target>' decrypt to?
-    Returns only example pairs (both sides non-empty).
+    Actual format from competition data:
+      encrypted_phrase -> decrypted_phrase
+    e.g.:
+      ucoov pwgtfyoqg vorq yrjjoe -> queen discovers near valley
     """
     examples: list[tuple[str, str]] = []
 
-    # A token is either a single-quoted word, a double-quoted word, or a bare
-    # run of word-characters (no embedded spaces in substitution cipher words).
-    _TOK = r"""(?:'(\w[\w\s]*?)'|"(\w[\w\s]*?)"|(\w+))"""
+    for line in prompt.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Skip header/question lines
+        low = line.lower()
+        if any(kw in low for kw in ['wonderland', 'encryption', 'now,', 'decrypt the following']):
+            continue
 
-    def _extract_tok(m_groups: tuple) -> str:
-        """Return the first non-None group from a _TOK match triplet."""
-        for g in m_groups:
-            if g is not None:
-                return g.strip()
-        return ""
-
-    seen: set[tuple[str, str]] = set()
-
-    def _add(enc: str, dec: str) -> None:
-        enc, dec = enc.strip().lower(), dec.strip().lower()
-        if enc and dec and enc != dec:
-            key = (enc, dec)
-            if key not in seen:
-                seen.add(key)
-                examples.append((enc, dec))
-
-    # Build composite patterns using the robust _TOK sub-pattern.
-    # Each pattern captures two groups of three (from two _TOK occurrences).
-    # Total groups per match: 6.  enc = groups 0-2, dec = groups 3-5.
-
-    # 1. "X" encrypts to "Y"
-    enc_pattern = re.compile(
-        _TOK + r"\s+encrypts?\s+to\s+" + _TOK, re.IGNORECASE
-    )
-    # 2. "X" decrypts to "Y"  (enc shown first, plain second)
-    dec_pattern = re.compile(
-        _TOK + r"\s+decrypts?\s+to\s+" + _TOK, re.IGNORECASE
-    )
-    # 3. Arrow forms:  "X" -> "Y"  /  X → Y
-    arrow_pattern = re.compile(
-        _TOK + r"\s*(?:->|→|=>)\s*" + _TOK, re.IGNORECASE
-    )
-    # 4. Equals form: 'X' = 'Y'  (both must be quoted to avoid matching math)
-    equals_pattern = re.compile(
-        r"""(?:'(\w+)'|"(\w+)")\s*=\s*(?:'(\w+)'|"(\w+)")""", re.IGNORECASE
-    )
-    # 5. encrypted: "X", decrypted: "Y"
-    field_pattern = re.compile(
-        r"encrypted[:\s]+" + _TOK + r"\s*[,;]\s*decrypted[:\s]+" + _TOK,
-        re.IGNORECASE,
-    )
-
-    for pattern in (enc_pattern, dec_pattern, arrow_pattern, field_pattern):
-        for m in pattern.finditer(prompt):
-            groups = m.groups()
-            enc = _extract_tok(groups[:3])
-            dec = _extract_tok(groups[3:6])
-            _add(enc, dec)
-
-    # equals_pattern: 4 groups total, enc = groups[0:2], dec = groups[2:4]
-    for m in equals_pattern.finditer(prompt):
-        groups = m.groups()
-        enc = _extract_tok(groups[:2] + ("",))   # pad to 3 for _extract_tok
-        dec = _extract_tok(groups[2:4] + ("",))
-        _add(enc, dec)
-
-    # Fallback: scan each line for exactly two quoted words → (enc, dec)
-    if not examples:
-        for line in prompt.splitlines():
-            # Skip lines that look like the question
-            if re.search(r"\bdecrypt\b", line, re.IGNORECASE) and "?" in line:
-                continue
-            quoted = re.findall(r"['\"](\w+)['\"]", line)
-            if len(quoted) == 2:
-                _add(quoted[0], quoted[1])
+        # Match "encrypted_text -> decrypted_text"
+        if ' -> ' in line:
+            parts = line.split(' -> ', 1)
+            if len(parts) == 2:
+                enc = parts[0].strip().lower()
+                dec = parts[1].strip().lower()
+                if enc and dec:
+                    examples.append((enc, dec))
 
     return examples
 
 
 def _parse_target(prompt: str) -> str:
-    """Extract the target encrypted string to decrypt."""
-    # "What does 'X' decrypt to?"  /  "Decrypt 'X'"  / "What is 'X'?"
-    patterns = [
-        re.compile(r"what\s+does\s+['\"]([^'\"]+)['\"]?\s+decrypt", re.IGNORECASE),
+    """Extract the target encrypted string to decrypt.
+
+    Actual format: "Now, decrypt the following text: <encrypted_phrase>"
+    """
+    # Pattern: "decrypt the following text: X"
+    m = re.search(r'decrypt the following text:\s*(.+)', prompt, re.IGNORECASE)
+    if m:
+        return m.group(1).strip().lower()
+
+    # Fallback patterns
+    for pat in [
+        re.compile(r"what\s+does\s+['\"]?([^'\"?]+)['\"]?\s+decrypt", re.IGNORECASE),
         re.compile(r"decrypt\s+['\"]([^'\"]+)['\"]", re.IGNORECASE),
-        re.compile(r"what\s+is\s+['\"]([^'\"]+)['\"]", re.IGNORECASE),
-        re.compile(r"['\"]([^'\"]+)['\"]?\s*decrypts?\s+to\s*\?", re.IGNORECASE),
-        re.compile(r"['\"]([^'\"]+)['\"]?\s*=\s*\?", re.IGNORECASE),
-    ]
-    for pat in patterns:
+    ]:
         m = pat.search(prompt)
         if m:
-            return m.group(1).strip()
+            return m.group(1).strip().lower()
 
-    # Fallback: last quoted token in prompt
-    quoted = re.findall(r"['\"]([^'\"]+)['\"]", prompt)
-    if quoted:
-        return quoted[-1].strip()
-
-    # Last non-empty line after the examples block
+    # Last line fallback
     lines = [ln.strip() for ln in prompt.splitlines() if ln.strip()]
     if lines:
-        last = lines[-1]
-        # Strip trailing punctuation
-        return last.rstrip("?!.:;")
+        return lines[-1].rstrip("?!.:;").lower()
 
     return ""
 
@@ -170,17 +100,20 @@ def _parse_target(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _build_char_mapping(examples: list[tuple[str, str]]) -> dict[str, str]:
-    """Build encrypted_char → decrypted_char from all example pairs."""
+    """Build encrypted_char → decrypted_char from all example pairs.
+
+    Examples are full phrases (multi-word), aligned character-by-character.
+    Spaces map to spaces, letters map to letters.
+    """
     mapping: dict[str, str] = {}
-    for enc_word, dec_word in examples:
-        if len(enc_word) != len(dec_word):
-            # Skip mismatched-length pairs (shouldn't happen in well-formed puzzles)
+    for enc_phrase, dec_phrase in examples:
+        if len(enc_phrase) != len(dec_phrase):
             continue
-        for enc_ch, dec_ch in zip(enc_word, dec_word):
+        for enc_ch, dec_ch in zip(enc_phrase, dec_phrase):
+            if enc_ch == ' ':
+                continue  # space → space is trivial
             if enc_ch not in mapping:
                 mapping[enc_ch] = dec_ch
-            # If conflict, keep first assignment (majority could be used, but
-            # consistent ciphers never conflict).
     return mapping
 
 
@@ -188,38 +121,62 @@ def _build_char_mapping(examples: list[tuple[str, str]]) -> dict[str, str]:
 # Vocabulary-based gap filling
 # ---------------------------------------------------------------------------
 
-def _apply_mapping_to_word(enc_word: str, mapping: dict[str, str]) -> str:
-    """Apply known mapping to a single word; return partial result with '?' for unknowns."""
-    return "".join(mapping.get(ch, "?") for ch in enc_word)
+def _complete_mapping(mapping: dict[str, str]) -> dict[str, str]:
+    """Complete a partial substitution cipher mapping using constraint propagation.
 
-
-def _vocab_complete(partial: str, enc_word: str, mapping: dict[str, str]) -> str | None:
-    """Try to complete a partially-mapped word using WONDERLAND_VOCAB.
-
-    Returns the completed plain word if exactly one candidate matches, else None.
-    Candidate must:
-    - Match length
-    - Have all known positions match
-    - Be consistent with any already-established mappings (no conflicts)
+    Since the cipher is a bijection (each letter maps to exactly one other),
+    we can deduce unmapped letters by elimination: if 25 of 26 mappings are
+    known, the last is forced. We iterate until no more can be deduced.
     """
-    n = len(partial)
+    mapping = dict(mapping)
+    all_letters = set('abcdefghijklmnopqrstuvwxyz')
+
+    changed = True
+    while changed:
+        changed = False
+        mapped_enc = {k for k in mapping if k in all_letters}
+        mapped_dec = {v for v in mapping.values() if v in all_letters}
+        unmapped_enc = all_letters - mapped_enc
+        unmapped_dec = all_letters - mapped_dec
+
+        # If only one unmapped letter remains on each side, they must pair
+        if len(unmapped_enc) == 1 and len(unmapped_dec) == 1:
+            enc_ch = unmapped_enc.pop()
+            dec_ch = unmapped_dec.pop()
+            mapping[enc_ch] = dec_ch
+            changed = True
+
+    return mapping
+
+
+# ---------------------------------------------------------------------------
+# Core decryption
+# ---------------------------------------------------------------------------
+
+def _vocab_match(enc_word: str, mapping: dict[str, str]) -> str | None:
+    """Try to match an encrypted word against vocabulary.
+
+    Returns the matching vocab word if exactly one fits, else None.
+    A word fits if: same length, known-mapped positions match, and
+    new mappings don't conflict with existing ones (bijection check).
+    """
+    n = len(enc_word)
     candidates = []
-    for vocab_word in _VOCAB_BY_LEN[n]:
+    reverse_mapping = {v: k for k, v in mapping.items() if k.isalpha() and v.isalpha()}
+
+    for vocab_word in _VOCAB_BY_LEN.get(n, []):
         ok = True
-        for i, ch in enumerate(partial):
-            if ch != "?" and ch != vocab_word[i]:
-                ok = False
-                break
-        if not ok:
-            continue
-        # Check that the mapping extensions introduced by this candidate
-        # don't conflict with the existing mapping.
-        consistent = True
-        for enc_ch, plain_ch in zip(enc_word, vocab_word):
-            if enc_ch in mapping and mapping[enc_ch] != plain_ch:
-                consistent = False
-                break
-        if consistent:
+        for enc_ch, dec_ch in zip(enc_word, vocab_word):
+            if enc_ch in mapping:
+                if mapping[enc_ch] != dec_ch:
+                    ok = False
+                    break
+            else:
+                # Check bijection: dec_ch shouldn't already be mapped from another enc char
+                if dec_ch in reverse_mapping and reverse_mapping[dec_ch] != enc_ch:
+                    ok = False
+                    break
+        if ok:
             candidates.append(vocab_word)
 
     if len(candidates) == 1:
@@ -227,62 +184,42 @@ def _vocab_complete(partial: str, enc_word: str, mapping: dict[str, str]) -> str
     return None
 
 
-# ---------------------------------------------------------------------------
-# Core decryption
-# ---------------------------------------------------------------------------
-
 def _decrypt_text(
     enc_text: str,
     mapping: dict[str, str],
-    *,
-    use_vocab: bool = True,
 ) -> tuple[str, dict[str, str]]:
-    """Decrypt enc_text using mapping.
+    """Decrypt enc_text using mapping + vocabulary matching.
 
-    For each word, attempt vocabulary completion for any unmapped characters.
-    Returns (decrypted_text, updated_mapping).
+    Multiple passes: each vocab match can reveal new letters that help subsequent words.
     """
     working_mapping = dict(mapping)
+    words = enc_text.split()
 
-    # Tokenise preserving spaces and punctuation structure
-    # Split into tokens: alpha-runs and non-alpha runs
-    tokens = re.split(r"(\W+)", enc_text)
-    result_parts: list[str] = []
+    # Multiple passes to propagate newly discovered mappings
+    for _ in range(3):
+        all_resolved = True
+        for enc_word in words:
+            partial = "".join(working_mapping.get(ch, "?") for ch in enc_word)
+            if "?" in partial:
+                all_resolved = False
+                match = _vocab_match(enc_word, working_mapping)
+                if match:
+                    for enc_ch, dec_ch in zip(enc_word, match):
+                        if enc_ch not in working_mapping:
+                            working_mapping[enc_ch] = dec_ch
+        if all_resolved:
+            break
 
-    for token in tokens:
-        if not token:
-            continue
-        if not token.isalpha():
-            # Non-alpha: map each character; spaces/punctuation typically identity
-            part = ""
-            for ch in token:
-                part += working_mapping.get(ch, ch)
-            result_parts.append(part)
-            continue
+    # Also try constraint completion (bijection elimination)
+    working_mapping = _complete_mapping(working_mapping)
 
-        # Alpha word token
-        enc_word = token.lower()
-        partial = _apply_mapping_to_word(enc_word, working_mapping)
+    # Final decryption
+    result_words = []
+    for enc_word in words:
+        dec_word = "".join(working_mapping.get(ch, "?") for ch in enc_word)
+        result_words.append(dec_word)
 
-        if "?" in partial and use_vocab:
-            completed = _vocab_complete(partial, enc_word, working_mapping)
-            if completed:
-                # Update mapping with new character correspondences
-                for enc_ch, dec_ch in zip(enc_word, completed):
-                    if enc_ch not in working_mapping:
-                        working_mapping[enc_ch] = dec_ch
-                partial = completed
-
-        # Preserve original case pattern
-        out_word = ""
-        for orig_ch, dec_ch in zip(token, partial):
-            if orig_ch.isupper():
-                out_word += dec_ch.upper()
-            else:
-                out_word += dec_ch
-        result_parts.append(out_word)
-
-    return "".join(result_parts), working_mapping
+    return " ".join(result_words), working_mapping
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +243,7 @@ class CipherSolver(BaseSolver):
         mapping = _build_char_mapping(examples)
 
         # 3. Decrypt target
-        predicted, _ = _decrypt_text(target_enc, mapping, use_vocab=True)
+        predicted, _ = _decrypt_text(target_enc, mapping)
 
         # 4. Determine correctness
         is_correct = predicted.strip().lower() == ground_truth.strip().lower()

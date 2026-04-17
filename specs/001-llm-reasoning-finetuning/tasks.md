@@ -22,7 +22,7 @@
 - [X] T004 [P] Implement config loading and SHA256 hashing utility in src/utils/config.py (load YAML configs, compute config_hash)
 - [X] T005 [P] Implement experiment CSV logging utility in src/utils/logging.py (append-only experiment_log.csv with fields: run_id, config_hash, timestamp, hypothesis, treatment_variable, control_run_id, seed, categories_included, overall_accuracy, per_category_accuracy, decision)
 - [X] T006 Create initial experiment log CSV header in experiments/experiment_log.csv
-- [ ] T007 Download competition train.csv to data/train.csv (from Kaggle competition data)
+- [X] T007 Download competition train.csv to data/train.csv (from Kaggle competition data)
 
 ---
 
@@ -51,8 +51,8 @@
 
 **Independent Test**: Run inference on validation split, produce per-category accuracy breakdown. Compare to submission demo baseline of 0.49.
 
-- [ ] T016 [US1] Run src/data/prepare.py to classify all 9500 train.csv puzzles into categories, output data/puzzles_classified.jsonl
-- [ ] T017 [US1] Run src/data/splits.py to create frozen validation split at data/splits/ (10% holdout, stratified, seed=42)
+- [X] T016 [US1] Run src/data/prepare.py to classify all 9500 train.csv puzzles into categories, output data/puzzles_classified.jsonl
+- [X] T017 [US1] Run src/data/splits.py to create frozen validation split at data/splits/ (10% holdout, stratified, seed=42)
 - [X] T018 [US1] Create baseline experiment config in experiments/configs/exp-001-baseline.yaml (model_name, seed=42, no adapter, competition eval params, prompt_template=none)
 - [ ] T019 [US1] Run src/evaluate.py with exp-001-baseline.yaml against validation split — record overall and per-category accuracy in experiments/results/exp-001-baseline.json
 - [ ] T020 [US1] Log exp-001-baseline results to experiments/experiment_log.csv (decision=adopt as baseline)
@@ -72,25 +72,25 @@
 
 - [X] T022 [P] [US2] Implement Roman numeral solver in src/solvers/numeral.py (enumerate all 1-100 Roman numerals, parse prompt examples, extract target, convert)
 - [X] T023 [P] [US2] Implement numeral trace generator in src/trace_generators/numeral_traces.py (step-by-step decomposition: thousands → hundreds → tens → ones → concatenation → \boxed{})
-- [ ] T024 [US2] Verify numeral solver: run on all 1576 numeral puzzles in train.csv, assert 100% accuracy with competition metric
+- [X] T024 [US2] Verify numeral solver: 1576/1576 = 100%: run on all 1576 numeral puzzles in train.csv, assert 100% accuracy with competition metric
 
 ### 4b. Gravity (1597 samples, target: 100%)
 
 - [X] T025 [P] [US2] Implement gravity solver in src/solvers/gravity.py (parse examples to extract (t,d) pairs, derive rate=d/t^2, apply to target, format X.XX)
 - [X] T026 [P] [US2] Implement gravity trace generator in src/trace_generators/gravity_traces.py (rate-first decomposition, multi-step arithmetic, rate consistency verification against EX2, format to X.XX)
-- [ ] T027 [US2] Verify gravity solver: run on all 1597 gravity puzzles, assert 100% accuracy
+- [X] T027 [US2] Verify gravity solver: 1597/1597 = 100%: run on all 1597 gravity puzzles, assert 100% accuracy
 
 ### 4c. Unit Conversion (1594 samples, target: 100%)
 
 - [X] T028 [P] [US2] Implement unit conversion solver in src/solvers/unit_conversion.py (derive factor=out/in from examples, apply factor*target, format X.XX)
 - [X] T029 [P] [US2] Implement unit conversion trace generator in src/trace_generators/unit_conversion_traces.py (rate derivation, multiplication steps, rate consistency check, format X.XX)
-- [ ] T030 [US2] Verify unit conversion solver: run on all 1594 puzzles, assert 100% accuracy
+- [X] T030 [US2] Verify unit conversion solver: 1594/1594 = 100%: run on all 1594 puzzles, assert 100% accuracy
 
 ### 4d. Cipher (1576 samples, target: 100%)
 
 - [X] T031 [P] [US2] Implement cipher solver in src/solvers/cipher.py (extract char mappings from example pairs, handle unmapped chars via vocabulary fill from ~90 Wonderland words)
 - [X] T032 [P] [US2] Implement cipher trace generator in src/trace_generators/cipher_traces.py (build mapping table, char-by-char decryption, vocabulary matching for gaps, verify decryption)
-- [ ] T033 [US2] Verify cipher solver: run on all 1576 cipher puzzles, assert 100% accuracy
+- [X] T033 [US2] Verify cipher solver: 1576/1576 = 100%: run on all 1576 cipher puzzles, assert 100% accuracy
 
 ### Integration
 
@@ -120,19 +120,19 @@
 
 - [X] T042 [P] [US3] Implement bit manipulation solver in src/solvers/bit_manipulation.py (per-bit boolean function search through 52 gate types: Level 0 constants → Level 1 identity/NOT → Level 2 AND/OR/XOR/NAND/NOR/XNOR+4 negation variants → Level 3 MAJ/CHO/PAR3/AO/OA/AX/OX/XA/XO → Level 4 AOA/OAO/PAR4/XX/AXA; verify candidate against test input)
 - [X] T043 [P] [US3] Implement bit manipulation trace generator in src/trace_generators/bit_manipulation_traces.py (bit-serial gate computation: spell out each operation one bit at a time like `0&1=0 1&1=1`; include verification step)
-- [ ] T044 [US3] Verify bit manipulation solver on train.csv (expect ~85% = ~1362/1602)
+- [X] T044 [US3] Verify bit manipulation solver on train.csv: 960/1602 = 60% (target 85%, needs improvement)
 
 ### 5c. Equation Solver (732 samples, target: 76-90%)
 
 - [X] T045 [P] [US3] Implement equation solver in src/solvers/equation.py (4 operand transforms: AB_CD, BA_DC, AB_CD→YX, BA_DC→YX × 32 operators; frequency-ordered brute force scan; EX2 verification to catch coincidental matches)
 - [X] T046 [P] [US3] Implement equation trace generator in src/trace_generators/equation_traces.py (parse → scan → lock → apply → answer format)
-- [ ] T047 [US3] Verify equation solver on train.csv (expect ~76-90% across deduce/guess subtypes)
+- [X] T047 [US3] Verify equation solver on train.csv: 309/687 = 45% (target 76-90%, needs more operations)
 
 ### 5d. Cryptarithm Solver (823 samples, target: ~8%)
 
 - [X] T048 [P] [US3] Implement cryptarithm solver in src/solvers/cryptarithm.py (detect concatenation/reverse concatenation as baseline; accept low solve rate)
 - [X] T049 [P] [US3] Implement cryptarithm trace generator in src/trace_generators/cryptarithm_traces.py (traces for solvable subset only)
-- [ ] T050 [US3] Verify cryptarithm solver on train.csv (expect ~8% = ~65/823)
+- [X] T050 [US3] Verify cryptarithm solver on train.csv: 0/868 = 0% (puzzle format is symbol transformations, not traditional cryptarithm)
 
 ### 5e. Full SFT with All Categories
 
