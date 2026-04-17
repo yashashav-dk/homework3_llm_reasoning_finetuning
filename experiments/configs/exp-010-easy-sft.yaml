@@ -1,0 +1,41 @@
+run_id: exp-010-easy-sft
+hypothesis: "QLoRA SFT on easy category traces teaches model to solve numeral, gravity, unit_conversion, cipher puzzles"
+treatment_variable: sft_easy_categories
+control_run_id: exp-001-baseline
+model_name: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+seed: 42
+categories_included:
+  - numeral
+  - gravity
+  - unit_conversion
+  - cipher
+
+data_path: data/sft/train_sft_easy.jsonl
+output_dir: checkpoints/exp-010-easy-sft
+
+lora:
+  r: 32
+  lora_alpha: 16
+  target_modules: ".*\\.(in_proj|out_proj|up_proj|down_proj)$"
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+training:
+  learning_rate: 2.0e-4
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8
+  max_seq_length: 4096
+  num_train_epochs: 1
+  warmup_ratio: 0.03
+  bf16: true
+  logging_steps: 10
+  save_strategy: epoch
+
+eval:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 7680
+  max_model_len: 8192
+  gpu_memory_utilization: 0.85
+  enable_thinking: true

@@ -1,0 +1,18 @@
+run_id: exp-001-baseline
+hypothesis: "Establish baseline accuracy of unmodified Nemotron-3-Nano-30B on competition puzzles"
+treatment_variable: none
+control_run_id: ""
+model_name: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+adapter_path: null
+seed: 42
+categories_included: all
+
+eval:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 7680
+  max_model_len: 8192
+  gpu_memory_utilization: 0.85
+  enable_thinking: true
+
+prompt_template: none

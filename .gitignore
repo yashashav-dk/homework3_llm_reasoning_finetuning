@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Data (large files)
+data/train.csv
+data/puzzles_classified.jsonl
+data/traces/
+data/sft/
+data/solver_results/
+
+# Model checkpoints (large)
+checkpoints/
+submissions/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Ruff cache
+.ruff_cache/
+
+# Playwright MCP
+.playwright-mcp/

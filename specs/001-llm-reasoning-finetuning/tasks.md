@@ -16,12 +16,12 @@
 
 **Purpose**: Project initialization, directory structure, shared utilities
 
-- [ ] T001 Create project directory structure per plan.md (src/solvers/, src/trace_generators/, src/data/, src/metrics/, src/utils/, experiments/configs/, experiments/results/, checkpoints/, submissions/, notebooks/, data/splits/, data/traces/, data/sft/)
-- [ ] T002 Create requirements.txt with pinned dependencies (torch>=2.2.0, transformers>=4.45.0, peft>=0.12.0, trl>=0.12.0, vllm>=0.12.0, datasets>=3.0.0, accelerate>=1.0.0, bitsandbytes>=0.44.0, polars>=1.0.0)
-- [ ] T003 [P] Implement seed management utility in src/utils/seeds.py (set PyTorch, NumPy, Python random seeds deterministically)
-- [ ] T004 [P] Implement config loading and SHA256 hashing utility in src/utils/config.py (load YAML configs, compute config_hash)
-- [ ] T005 [P] Implement experiment CSV logging utility in src/utils/logging.py (append-only experiment_log.csv with fields: run_id, config_hash, timestamp, hypothesis, treatment_variable, control_run_id, seed, categories_included, overall_accuracy, per_category_accuracy, decision)
-- [ ] T006 Create initial experiment log CSV header in experiments/experiment_log.csv
+- [X] T001 Create project directory structure per plan.md (src/solvers/, src/trace_generators/, src/data/, src/metrics/, src/utils/, experiments/configs/, experiments/results/, checkpoints/, submissions/, notebooks/, data/splits/, data/traces/, data/sft/)
+- [X] T002 Create requirements.txt with pinned dependencies (torch>=2.2.0, transformers>=4.45.0, peft>=0.12.0, trl>=0.12.0, vllm>=0.12.0, datasets>=3.0.0, accelerate>=1.0.0, bitsandbytes>=0.44.0, polars>=1.0.0)
+- [X] T003 [P] Implement seed management utility in src/utils/seeds.py (set PyTorch, NumPy, Python random seeds deterministically)
+- [X] T004 [P] Implement config loading and SHA256 hashing utility in src/utils/config.py (load YAML configs, compute config_hash)
+- [X] T005 [P] Implement experiment CSV logging utility in src/utils/logging.py (append-only experiment_log.csv with fields: run_id, config_hash, timestamp, hypothesis, treatment_variable, control_run_id, seed, categories_included, overall_accuracy, per_category_accuracy, decision)
+- [X] T006 Create initial experiment log CSV header in experiments/experiment_log.csv
 - [ ] T007 Download competition train.csv to data/train.csv (from Kaggle competition data)
 
 ---
@@ -32,14 +32,14 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Implement exact competition metric in src/metrics/competition.py: `extract_final_answer()` (boxed extraction with fallback patterns) and `verify()` (binary strict match, numeric rel_tol=1e-2, string case-insensitive) — copy logic exactly from competition-reference.md
-- [ ] T009 Implement puzzle category classifier in src/data/prepare.py (load train.csv, classify each row into: numeral, gravity, unit_conversion, cipher, bit_manipulation, equation_numeric_deduce, equation_numeric_guess, cryptarithm_deduce, cryptarithm_guess; output data/puzzles_classified.jsonl)
-- [ ] T010 Implement train/validation split in src/data/splits.py (90/10 stratified by category, deterministic seed=42, output data/splits/train_ids.json and val_ids.json)
-- [ ] T011 Implement abstract solver interface in src/solvers/base.py (BaseSolver with solve() and verify() methods per contracts/experiment-contract.md)
-- [ ] T012 Implement abstract trace generator interface in src/trace_generators/base.py (BaseTraceGenerator with generate_trace() returning thinking_text + final_answer, token counting, 7680 limit check)
-- [ ] T013 Implement SFT data formatter in src/data/format_sft.py (load traces, format as ChatML messages with `<think>...</think>` + `\boxed{}`, verify token count < 7680, output data/sft/train_sft.jsonl)
-- [ ] T014 Implement evaluation pipeline in src/evaluate.py (load model via vLLM with competition params: temp=0.0, top_p=1.0, max_tokens=7680, max_model_len=8192, enable_thinking=True; run inference; score with competition metric; report per-category accuracy)
-- [ ] T015 Implement adapter packaging in src/package.py (copy adapter_config.json + adapter_model.safetensors into submission.zip; validate rank<=32 and target_modules match regex)
+- [X] T008 Implement exact competition metric in src/metrics/competition.py: `extract_final_answer()` (boxed extraction with fallback patterns) and `verify()` (binary strict match, numeric rel_tol=1e-2, string case-insensitive) — copy logic exactly from competition-reference.md
+- [X] T009 Implement puzzle category classifier in src/data/prepare.py (load train.csv, classify each row into: numeral, gravity, unit_conversion, cipher, bit_manipulation, equation_numeric_deduce, equation_numeric_guess, cryptarithm_deduce, cryptarithm_guess; output data/puzzles_classified.jsonl)
+- [X] T010 Implement train/validation split in src/data/splits.py (90/10 stratified by category, deterministic seed=42, output data/splits/train_ids.json and val_ids.json)
+- [X] T011 Implement abstract solver interface in src/solvers/base.py (BaseSolver with solve() and verify() methods per contracts/experiment-contract.md)
+- [X] T012 Implement abstract trace generator interface in src/trace_generators/base.py (BaseTraceGenerator with generate_trace() returning thinking_text + final_answer, token counting, 7680 limit check)
+- [X] T013 Implement SFT data formatter in src/data/format_sft.py (load traces, format as ChatML messages with `<think>...</think>` + `\boxed{}`, verify token count < 7680, output data/sft/train_sft.jsonl)
+- [X] T014 Implement evaluation pipeline in src/evaluate.py (load model via vLLM with competition params: temp=0.0, top_p=1.0, max_tokens=7680, max_model_len=8192, enable_thinking=True; run inference; score with competition metric; report per-category accuracy)
+- [X] T015 Implement adapter packaging in src/package.py (copy adapter_config.json + adapter_model.safetensors into submission.zip; validate rank<=32 and target_modules match regex)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -53,7 +53,7 @@
 
 - [ ] T016 [US1] Run src/data/prepare.py to classify all 9500 train.csv puzzles into categories, output data/puzzles_classified.jsonl
 - [ ] T017 [US1] Run src/data/splits.py to create frozen validation split at data/splits/ (10% holdout, stratified, seed=42)
-- [ ] T018 [US1] Create baseline experiment config in experiments/configs/exp-001-baseline.yaml (model_name, seed=42, no adapter, competition eval params, prompt_template=none)
+- [X] T018 [US1] Create baseline experiment config in experiments/configs/exp-001-baseline.yaml (model_name, seed=42, no adapter, competition eval params, prompt_template=none)
 - [ ] T019 [US1] Run src/evaluate.py with exp-001-baseline.yaml against validation split — record overall and per-category accuracy in experiments/results/exp-001-baseline.json
 - [ ] T020 [US1] Log exp-001-baseline results to experiments/experiment_log.csv (decision=adopt as baseline)
 - [ ] T021 [US1] Build error analysis notebook at notebooks/error_analysis.ipynb (per-category accuracy, error types: wrong answer, wrong binary format, no \boxed{}, truncation, empty response; sample errors per category)
@@ -70,26 +70,26 @@
 
 ### 4a. Roman Numeral (1576 samples, target: 100%)
 
-- [ ] T022 [P] [US2] Implement Roman numeral solver in src/solvers/numeral.py (enumerate all 1-100 Roman numerals, parse prompt examples, extract target, convert)
-- [ ] T023 [P] [US2] Implement numeral trace generator in src/trace_generators/numeral_traces.py (step-by-step decomposition: thousands → hundreds → tens → ones → concatenation → \boxed{})
+- [X] T022 [P] [US2] Implement Roman numeral solver in src/solvers/numeral.py (enumerate all 1-100 Roman numerals, parse prompt examples, extract target, convert)
+- [X] T023 [P] [US2] Implement numeral trace generator in src/trace_generators/numeral_traces.py (step-by-step decomposition: thousands → hundreds → tens → ones → concatenation → \boxed{})
 - [ ] T024 [US2] Verify numeral solver: run on all 1576 numeral puzzles in train.csv, assert 100% accuracy with competition metric
 
 ### 4b. Gravity (1597 samples, target: 100%)
 
-- [ ] T025 [P] [US2] Implement gravity solver in src/solvers/gravity.py (parse examples to extract (t,d) pairs, derive rate=d/t^2, apply to target, format X.XX)
-- [ ] T026 [P] [US2] Implement gravity trace generator in src/trace_generators/gravity_traces.py (rate-first decomposition, multi-step arithmetic, rate consistency verification against EX2, format to X.XX)
+- [X] T025 [P] [US2] Implement gravity solver in src/solvers/gravity.py (parse examples to extract (t,d) pairs, derive rate=d/t^2, apply to target, format X.XX)
+- [X] T026 [P] [US2] Implement gravity trace generator in src/trace_generators/gravity_traces.py (rate-first decomposition, multi-step arithmetic, rate consistency verification against EX2, format to X.XX)
 - [ ] T027 [US2] Verify gravity solver: run on all 1597 gravity puzzles, assert 100% accuracy
 
 ### 4c. Unit Conversion (1594 samples, target: 100%)
 
-- [ ] T028 [P] [US2] Implement unit conversion solver in src/solvers/unit_conversion.py (derive factor=out/in from examples, apply factor*target, format X.XX)
-- [ ] T029 [P] [US2] Implement unit conversion trace generator in src/trace_generators/unit_conversion_traces.py (rate derivation, multiplication steps, rate consistency check, format X.XX)
+- [X] T028 [P] [US2] Implement unit conversion solver in src/solvers/unit_conversion.py (derive factor=out/in from examples, apply factor*target, format X.XX)
+- [X] T029 [P] [US2] Implement unit conversion trace generator in src/trace_generators/unit_conversion_traces.py (rate derivation, multiplication steps, rate consistency check, format X.XX)
 - [ ] T030 [US2] Verify unit conversion solver: run on all 1594 puzzles, assert 100% accuracy
 
 ### 4d. Cipher (1576 samples, target: 100%)
 
-- [ ] T031 [P] [US2] Implement cipher solver in src/solvers/cipher.py (extract char mappings from example pairs, handle unmapped chars via vocabulary fill from ~90 Wonderland words)
-- [ ] T032 [P] [US2] Implement cipher trace generator in src/trace_generators/cipher_traces.py (build mapping table, char-by-char decryption, vocabulary matching for gaps, verify decryption)
+- [X] T031 [P] [US2] Implement cipher solver in src/solvers/cipher.py (extract char mappings from example pairs, handle unmapped chars via vocabulary fill from ~90 Wonderland words)
+- [X] T032 [P] [US2] Implement cipher trace generator in src/trace_generators/cipher_traces.py (build mapping table, char-by-char decryption, vocabulary matching for gaps, verify decryption)
 - [ ] T033 [US2] Verify cipher solver: run on all 1576 cipher puzzles, assert 100% accuracy
 
 ### Integration
@@ -110,35 +110,35 @@
 
 ### 5a. First SFT on Easy Categories
 
-- [ ] T037 [US3] Create experiment config experiments/configs/exp-010-easy-sft.yaml (QLoRA r=32, lora_alpha=16, target_modules=`r".*\.(in_proj|out_proj|up_proj|down_proj)$"`, lr=2e-4, batch_size=4, grad_accum=8, max_seq_length=4096, epochs=1, seed=42, categories=numeral+gravity+unit_conversion+cipher)
-- [ ] T038 [US3] Implement QLoRA training script in src/train.py (load 30B model in 4-bit via BitsAndBytesConfig nf4, apply LoRA via PEFT with config from YAML, train with TRL SFTTrainer on data/sft/train_sft_easy.jsonl, save adapter to checkpoints/)
+- [X] T037 [US3] Create experiment config experiments/configs/exp-010-easy-sft.yaml (QLoRA r=32, lora_alpha=16, target_modules=`r".*\.(in_proj|out_proj|up_proj|down_proj)$"`, lr=2e-4, batch_size=4, grad_accum=8, max_seq_length=4096, epochs=1, seed=42, categories=numeral+gravity+unit_conversion+cipher)
+- [X] T038 [US3] Implement QLoRA training script in src/train.py (load 30B model in 4-bit via BitsAndBytesConfig nf4, apply LoRA via PEFT with config from YAML, train with TRL SFTTrainer on data/sft/train_sft_easy.jsonl, save adapter to checkpoints/)
 - [ ] T039 [US3] Run QLoRA training with exp-010-easy-sft.yaml, save adapter to checkpoints/exp-010-easy-sft/
 - [ ] T040 [US3] Evaluate exp-010 adapter on validation split with src/evaluate.py, log results, verify near-100% on easy categories (~0.67 overall)
 - [ ] T041 [US3] Package exp-010 adapter as submissions/submission-easy.zip, submit to Kaggle for first score
 
 ### 5b. Bit Manipulation Solver (1602 samples, target: 85%)
 
-- [ ] T042 [P] [US3] Implement bit manipulation solver in src/solvers/bit_manipulation.py (per-bit boolean function search through 52 gate types: Level 0 constants → Level 1 identity/NOT → Level 2 AND/OR/XOR/NAND/NOR/XNOR+4 negation variants → Level 3 MAJ/CHO/PAR3/AO/OA/AX/OX/XA/XO → Level 4 AOA/OAO/PAR4/XX/AXA; verify candidate against test input)
-- [ ] T043 [P] [US3] Implement bit manipulation trace generator in src/trace_generators/bit_manipulation_traces.py (bit-serial gate computation: spell out each operation one bit at a time like `0&1=0 1&1=1`; include verification step)
+- [X] T042 [P] [US3] Implement bit manipulation solver in src/solvers/bit_manipulation.py (per-bit boolean function search through 52 gate types: Level 0 constants → Level 1 identity/NOT → Level 2 AND/OR/XOR/NAND/NOR/XNOR+4 negation variants → Level 3 MAJ/CHO/PAR3/AO/OA/AX/OX/XA/XO → Level 4 AOA/OAO/PAR4/XX/AXA; verify candidate against test input)
+- [X] T043 [P] [US3] Implement bit manipulation trace generator in src/trace_generators/bit_manipulation_traces.py (bit-serial gate computation: spell out each operation one bit at a time like `0&1=0 1&1=1`; include verification step)
 - [ ] T044 [US3] Verify bit manipulation solver on train.csv (expect ~85% = ~1362/1602)
 
 ### 5c. Equation Solver (732 samples, target: 76-90%)
 
-- [ ] T045 [P] [US3] Implement equation solver in src/solvers/equation.py (4 operand transforms: AB_CD, BA_DC, AB_CD→YX, BA_DC→YX × 32 operators; frequency-ordered brute force scan; EX2 verification to catch coincidental matches)
-- [ ] T046 [P] [US3] Implement equation trace generator in src/trace_generators/equation_traces.py (parse → scan → lock → apply → answer format)
+- [X] T045 [P] [US3] Implement equation solver in src/solvers/equation.py (4 operand transforms: AB_CD, BA_DC, AB_CD→YX, BA_DC→YX × 32 operators; frequency-ordered brute force scan; EX2 verification to catch coincidental matches)
+- [X] T046 [P] [US3] Implement equation trace generator in src/trace_generators/equation_traces.py (parse → scan → lock → apply → answer format)
 - [ ] T047 [US3] Verify equation solver on train.csv (expect ~76-90% across deduce/guess subtypes)
 
 ### 5d. Cryptarithm Solver (823 samples, target: ~8%)
 
-- [ ] T048 [P] [US3] Implement cryptarithm solver in src/solvers/cryptarithm.py (detect concatenation/reverse concatenation as baseline; accept low solve rate)
-- [ ] T049 [P] [US3] Implement cryptarithm trace generator in src/trace_generators/cryptarithm_traces.py (traces for solvable subset only)
+- [X] T048 [P] [US3] Implement cryptarithm solver in src/solvers/cryptarithm.py (detect concatenation/reverse concatenation as baseline; accept low solve rate)
+- [X] T049 [P] [US3] Implement cryptarithm trace generator in src/trace_generators/cryptarithm_traces.py (traces for solvable subset only)
 - [ ] T050 [US3] Verify cryptarithm solver on train.csv (expect ~8% = ~65/823)
 
 ### 5e. Full SFT with All Categories
 
 - [ ] T051 [US3] Generate all CoT traces for hard categories, save to data/traces/ (bit_manipulation_traces.jsonl, equation_traces.jsonl, cryptarithm_traces.jsonl)
 - [ ] T052 [US3] Run src/data/format_sft.py on all category traces to produce data/sft/train_sft_full.jsonl
-- [ ] T053 [US3] Create experiment config experiments/configs/exp-011-full-sft.yaml (same QLoRA config, categories=all, treatment_variable=add_hard_categories, control_run_id=exp-010)
+- [X] T053 [US3] Create experiment config experiments/configs/exp-011-full-sft.yaml (same QLoRA config, categories=all, treatment_variable=add_hard_categories, control_run_id=exp-010)
 - [ ] T054 [US3] Run QLoRA training with exp-011-full-sft.yaml, save adapter to checkpoints/exp-011-full-sft/
 - [ ] T055 [US3] Evaluate exp-011 adapter on validation split, log per-category accuracy, compare to exp-010 (~0.85 target)
 
