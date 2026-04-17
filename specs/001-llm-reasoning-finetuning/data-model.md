@@ -1,204 +1,151 @@
 # Data Model: LLM Reasoning Fine-Tuning Pipeline
 
-**Branch**: `001-llm-reasoning-finetuning` | **Date**: 2026-04-14
-**Revision**: 2 (corrected for 30B model, adapter submission)
+**Branch**: `001-llm-reasoning-finetuning` | **Date**: 2026-04-16
+**Revision**: 3 (rebuilt for solver-first architecture)
 
 ## Entities
 
+### Puzzle
+
+A single puzzle from train.csv with its category classification.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique puzzle identifier (from train.csv) |
+| prompt | string | Full puzzle text with examples |
+| answer | string | Ground truth answer |
+| category | enum | numeral / gravity / unit_conversion / cipher / bit_manipulation / equation_numeric_deduce / equation_numeric_guess / cryptarithm_deduce / cryptarithm_guess |
+| split | enum | train / validation |
+
+### SolverResult
+
+Output from running a category-specific solver on a puzzle.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| puzzle_id | string | Reference to puzzle |
+| category | enum | Puzzle category |
+| predicted_answer | string | Solver's answer |
+| is_correct | bool | verify(answer, predicted_answer) |
+| solve_method | string | Which algorithm/gate/operator matched |
+| confidence | float | 1.0 for deterministic, <1.0 for heuristic |
+
+### CoTTrace
+
+A generated chain-of-thought reasoning trace for training.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| puzzle_id | string | Reference to puzzle |
+| category | enum | Puzzle category |
+| thinking_text | string | Content inside `<think>...</think>` |
+| final_answer | string | Content inside `\boxed{}` |
+| token_count | int | Total tokens (must be < 7680) |
+| is_verified | bool | Solver confirms trace produces correct answer |
+
+### SFTExample
+
+A formatted training example ready for QLoRA fine-tuning.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| puzzle_id | string | Reference to puzzle |
+| messages | list | Chat-format messages (user + assistant) |
+| total_tokens | int | Must be < 7680 |
+
+User message format:
+```
+{puzzle.prompt}
+Please put your final answer inside `\boxed{}`. For example: `\boxed{your answer}`
+```
+
+Assistant message format:
+```
+<think>
+{trace.thinking_text}
+</think>
+
+\boxed{{trace.final_answer}}
+```
+
 ### Experiment
 
-Represents a single experimental run with tracked configuration
-and results.
+Unchanged from previous revision — tracks each training/eval run.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| run_id | string | Unique identifier (e.g., `exp-001-baseline`) |
-| config_hash | string | SHA256 of the config file |
-| timestamp | datetime | Run start time (ISO 8601) |
+| run_id | string | Unique identifier |
+| config_hash | string | SHA256 of config file |
+| timestamp | datetime | Run start time |
 | hypothesis | string | What this experiment tests |
-| treatment_variable | string | Single variable changed (ablation) |
-| control_run_id | string | Reference to baseline/control run |
-| seed | int | Random seed (PyTorch + NumPy + Python) |
-| model_id | string | Always `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` |
-| adapter_path | string | Path to LoRA adapter (null if base model) |
-| prompt_template_id | string | Reference to prompt template used |
-| dataset_id | string | Reference to training dataset version |
+| treatment_variable | string | Single variable changed |
+| control_run_id | string | Reference to baseline |
+| seed | int | Random seed |
+| categories_included | list | Which puzzle categories in training data |
 | status | enum | pending / running / completed / failed |
 
-### ExperimentConfig
-
-YAML configuration file committed alongside each run.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| model_name | string | HuggingFace model ID (30B) |
-| seed | int | Random seed (required, no default) |
-| quantization | string | none / fp8 / nf4 (for QLoRA) |
-
-**Training-only fields**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| lora_rank | int | LoRA rank (max 32, competition limit) |
-| lora_alpha | int | LoRA alpha scaling |
-| lora_target_modules | list | Target modules for LoRA |
-| learning_rate | float | Peak learning rate |
-| batch_size | int | Per-device batch size |
-| gradient_accumulation | int | Gradient accumulation steps |
-| max_seq_length | int | Maximum sequence length |
-| num_epochs | int | Training epochs |
-| warmup_ratio | float | LR warmup ratio |
-
-**Evaluation fields (must match competition)**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| max_new_tokens | int | 7680 (competition-fixed) |
-| temperature | float | 0.0 (competition-fixed) |
-| top_p | float | 1.0 (competition-fixed) |
-| max_model_len | int | 8192 (competition-fixed) |
-
-**Metadata**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| prompt_template | string | Path to prompt template YAML |
-| dataset_id | string | Dataset identifier (null for eval-only) |
-| treatment_variable | string | What changed vs. control |
-| control_run_id | string | Reference control experiment |
-
 ### ExperimentResult
-
-Metrics recorded after each run.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | run_id | string | Reference to experiment |
-| overall_accuracy | float | Aggregate accuracy (competition metric) |
-| math_accuracy | float | Accuracy on math domain |
-| code_accuracy | float | Accuracy on code domain |
-| logic_accuracy | float | Accuracy on logic domain |
-| boxed_rate | float | % of responses with valid \boxed{} |
-| truncation_rate | float | % of responses hitting token limit |
+| overall_accuracy | float | Aggregate accuracy |
+| per_category_accuracy | dict | {category: accuracy} for all 7+ |
+| min_logprob | float | Minimum logprob across all traces |
 | total_time_seconds | float | Wall-clock time |
-| peak_vram_gb | float | Peak GPU memory usage |
-| num_samples_evaluated | int | Number of eval samples |
-| delta_vs_control | float | Accuracy change vs. control run |
+| peak_vram_gb | float | Peak GPU memory |
 | decision | enum | adopt / revert / investigate |
-| notes | string | Free-text observations |
-
-### PromptTemplate
-
-System prompt and few-shot example configuration.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| template_id | string | Unique identifier |
-| system_prompt | string | System message (must instruct \boxed{}) |
-| few_shot_examples | list | Domain-tagged example pairs |
-| format_instructions | string | \boxed{} format guidance |
-
-### TrainingDataset
-
-Curated dataset with provenance tracking.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| dataset_id | string | Unique identifier + version |
-| source | string | `nvidia/OpenMathReasoning` |
-| solution_type | string | cot / tir / genselect |
-| license | string | CC-BY-4.0 |
-| num_samples | int | Number of training samples |
-| filtering_method | string | How data was filtered |
-| max_token_length | int | Longest solution (tokens) |
-| boxed_format_rate | float | % with valid \boxed{} answers |
-| domain_distribution | dict | Counts by domain category |
 
 ### LoRAAdapter
-
-Fine-tuned adapter weights for submission.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | adapter_id | string | Unique identifier |
-| run_id | string | Experiment that produced this |
+| run_id | string | Experiment that produced it |
 | rank | int | LoRA rank (must be <= 32) |
-| alpha | int | LoRA alpha |
-| target_modules | list | Which model layers adapted |
-| base_model | string | Must be Nemotron-3-Nano-30B |
-| adapter_config_path | string | Path to adapter_config.json |
-| weights_path | string | Path to adapter weights |
+| target_modules | string | Regex pattern for target modules |
 | local_accuracy | float | Accuracy on local validation split |
-
-### Submission
-
-Kaggle submission artifact.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| submission_id | string | Unique identifier |
-| adapter_id | string | LoRA adapter used |
-| local_score | float | Score on local validation split |
-| public_score | float | Kaggle public leaderboard (null pre-submit) |
-| zip_path | string | Path to submission.zip |
-| submitted_at | datetime | Submission timestamp |
+| per_category_accuracy | dict | Per-category breakdown |
 
 ## Relationships
 
 ```text
-Experiment 1──1 ExperimentConfig
+Puzzle 1──1 SolverResult (per solver run)
+Puzzle 1──1 CoTTrace (per trace generation)
+CoTTrace 1──1 SFTExample (formatting step)
+Experiment 1──N SFTExample (training data)
 Experiment 1──1 ExperimentResult
-Experiment N──1 PromptTemplate
-Experiment N──1 TrainingDataset (nullable, eval-only runs)
-Experiment 1──N LoRAAdapter (training runs produce adapters)
-LoRAAdapter 1──N Submission
-Experiment N──1 Experiment (control_run_id → parent baseline)
+Experiment 1──N LoRAAdapter
 ```
 
 ## Storage Format
 
-All entities stored as flat files:
-
 ```text
-experiments/
-├── experiment_log.csv       # One row per experiment (append-only)
-├── configs/
-│   ├── exp-001-baseline.yaml
-│   ├── exp-002-cot-prompt.yaml
+data/
+├── train.csv                    # Competition data (9500 puzzles)
+├── puzzles_classified.jsonl     # Puzzles with category labels
+├── splits/
+│   ├── train_ids.json           # 90% puzzle IDs for training
+│   └── val_ids.json             # 10% puzzle IDs for evaluation
+├── solver_results/
+│   ├── numeral_results.jsonl
+│   ├── gravity_results.jsonl
 │   └── ...
-└── results/
-    ├── exp-001-baseline.json
-    └── ...
+├── traces/
+│   ├── numeral_traces.jsonl
+│   ├── gravity_traces.jsonl
+│   └── ...
+└── sft/
+    └── train_sft.jsonl          # Formatted SFT examples
 
-prompts/
-├── baseline.yaml
-├── cot-math.yaml
-└── ...
+experiments/
+├── experiment_log.csv
+├── configs/
+└── results/
 
 checkpoints/
-├── exp-010-qlora-r16/
+├── exp-010-easy/
 │   ├── adapter_config.json
 │   └── adapter_model.safetensors
-└── exp-011-qlora-r32/
-    ├── adapter_config.json
-    └── adapter_model.safetensors
-
-submissions/
-├── submission-001.zip
-└── ...
+└── best/
 ```
-
-## Validation Rules
-
-- `run_id` MUST be unique across all experiments
-- `seed` MUST be explicitly set (no null/random default)
-- `config_hash` MUST match the committed config file
-- `treatment_variable` MUST name exactly one changed variable
-  (or "compound: X, Y" with justification)
-- `lora_rank` MUST be <= 32 (competition enforced)
-- `model_id` MUST be `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16`
-- `decision` MUST be set before starting the next experiment
-- Evaluation params (temperature, top_p, max_tokens) MUST match
-  competition values exactly
-- All datasets MUST have `license` = CC-BY-4.0 or equivalent
-  permissive license
