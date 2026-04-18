@@ -144,19 +144,19 @@ def train(config: dict) -> dict:
     # ------------------------------------------------------------------
     # SFTTrainer config
     # ------------------------------------------------------------------
+    training_cfg = config.get("training", {})
     sft_config = SFTConfig(
         output_dir=output_dir,
-        learning_rate=float(config.get("learning_rate", 2e-4)),
-        per_device_train_batch_size=int(config.get("per_device_train_batch_size", 4)),
-        gradient_accumulation_steps=int(config.get("gradient_accumulation_steps", 8)),
-        max_seq_length=int(config.get("max_seq_length", 4096)),
-        num_train_epochs=int(config.get("num_train_epochs", 1)),
-        warmup_ratio=float(config.get("warmup_ratio", 0.03)),
+        learning_rate=float(training_cfg.get("learning_rate", 2e-4)),
+        per_device_train_batch_size=int(training_cfg.get("per_device_train_batch_size", 4)),
+        gradient_accumulation_steps=int(training_cfg.get("gradient_accumulation_steps", 8)),
+        max_seq_length=int(training_cfg.get("max_seq_length", 4096)),
+        num_train_epochs=int(training_cfg.get("num_train_epochs", 1)),
+        warmup_ratio=float(training_cfg.get("warmup_ratio", 0.03)),
         bf16=True,
-        logging_steps=int(config.get("logging_steps", 10)),
+        logging_steps=int(training_cfg.get("logging_steps", 10)),
         save_strategy="epoch",
-        # Required for chat-formatted JSONL: use the ``messages`` column.
-        dataset_text_field=None,  # let SFT handle messages format
+        dataset_text_field=None,
     )
 
     trainer = SFTTrainer(

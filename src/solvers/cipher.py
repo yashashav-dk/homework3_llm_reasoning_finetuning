@@ -51,12 +51,8 @@ def _parse_examples(prompt: str) -> list[tuple[str, str]]:
         line = line.strip()
         if not line:
             continue
-        # Skip header/question lines
-        low = line.lower()
-        if any(kw in low for kw in ['wonderland', 'encryption', 'now,', 'decrypt the following']):
-            continue
 
-        # Match "encrypted_text -> decrypted_text"
+        # Match example pairs FIRST (before keyword filtering)
         if ' -> ' in line:
             parts = line.split(' -> ', 1)
             if len(parts) == 2:

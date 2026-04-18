@@ -228,7 +228,7 @@ def main() -> None:
 
         with open(args.config) as fh:
             config = yaml.safe_load(fh) or {}
-        inference_kwargs.update(config.get("inference", {}))
+        inference_kwargs.update(config.get("eval", config.get("inference", {})))
 
     # ------------------------------------------------------------------
     # Load puzzles
