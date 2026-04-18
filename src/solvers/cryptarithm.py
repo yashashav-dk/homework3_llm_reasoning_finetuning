@@ -85,7 +85,7 @@ def _parse_prompt(prompt: str) -> CryptarithmPuzzle | None:
 
     # ---- 3. Parse operands, operator, result ---------------------------------
     # Normalise: remove stray separator chars, collapse whitespace
-    expr_clean = re.sub(r"[-]+", "", expr_line)   # remove dashes used as separator lines
+    expr_clean = re.sub(r"--+", "", expr_line)   # remove runs of 2+ dashes (separators), keep single - (subtraction)
     expr_clean = re.sub(r"\s+", " ", expr_clean).strip()
 
     # Detect concatenation operator (unusual symbols) or explicit "concat" / "|"
