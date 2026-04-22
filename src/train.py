@@ -168,20 +168,33 @@ def train(config: dict) -> dict:
     # SFTTrainer config
     # ------------------------------------------------------------------
     training_cfg = config.get("training", {})
-    sft_config = SFTConfig(
-        output_dir=output_dir,
-        learning_rate=float(training_cfg.get("learning_rate", 2e-4)),
-        per_device_train_batch_size=int(training_cfg.get("per_device_train_batch_size", 4)),
-        gradient_accumulation_steps=int(training_cfg.get("gradient_accumulation_steps", 8)),
-        max_seq_length=int(training_cfg.get("max_seq_length", 4096)),
-        num_train_epochs=int(training_cfg.get("num_train_epochs", 1)),
-        warmup_ratio=float(training_cfg.get("warmup_ratio", 0.03)),
-        bf16=True,
-        gradient_checkpointing=bool(training_cfg.get("gradient_checkpointing", False)),
-        logging_steps=int(training_cfg.get("logging_steps", 10)),
-        save_strategy="epoch",
-        dataset_text_field=None,
-    )
+    max_seq = int(training_cfg.get("max_seq_length", 4096))
+
+    sft_kwargs = {
+        "output_dir": output_dir,
+        "learning_rate": float(training_cfg.get("learning_rate", 2e-4)),
+        "per_device_train_batch_size": int(training_cfg.get("per_device_train_batch_size", 4)),
+        "gradient_accumulation_steps": int(training_cfg.get("gradient_accumulation_steps", 8)),
+        "num_train_epochs": int(training_cfg.get("num_train_epochs", 1)),
+        "warmup_ratio": float(training_cfg.get("warmup_ratio", 0.03)),
+        "bf16": True,
+        "gradient_checkpointing": bool(training_cfg.get("gradient_checkpointing", False)),
+        "logging_steps": int(training_cfg.get("logging_steps", 10)),
+        "save_strategy": "epoch",
+    }
+
+    # TRL >= 0.16 renamed max_seq_length → max_length
+    import inspect
+    _sft_params = inspect.signature(SFTConfig).parameters
+    if "max_seq_length" in _sft_params:
+        sft_kwargs["max_seq_length"] = max_seq
+    else:
+        sft_kwargs["max_length"] = max_seq
+
+    if "dataset_text_field" in _sft_params:
+        sft_kwargs["dataset_text_field"] = None
+
+    sft_config = SFTConfig(**sft_kwargs)
 
     # Completion-only loss: only compute loss on assistant response tokens.
     response_template = "<|im_start|>assistant\n"
