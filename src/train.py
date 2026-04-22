@@ -122,7 +122,15 @@ def train(config: dict) -> dict:
     Returns:
         Dict of training metrics reported by SFTTrainer.
     """
-    from trl import DataCollatorForCompletionOnlyLM, SFTConfig, SFTTrainer
+    from trl import SFTConfig, SFTTrainer
+
+    try:
+        from trl import DataCollatorForCompletionOnlyLM
+        _has_collator = True
+    except ImportError:
+        # TRL >= 1.0 removed DataCollatorForCompletionOnlyLM;
+        # use SFTConfig(completions_only=True) instead
+        _has_collator = False
 
     model_name: str = config["model_name"]
     data_path: str = config["data_path"]
@@ -178,70 +186,75 @@ def train(config: dict) -> dict:
     # Completion-only loss: only compute loss on assistant response tokens.
     response_template = "<|im_start|>assistant\n"
 
-    # -- Validation gate: response template tokenises to known IDs --
-    response_token_ids = tokenizer.encode(
-        response_template, add_special_tokens=False
-    )
-    if len(response_token_ids) == 0:
-        raise ValueError(
-            "FATAL: response_template tokenises to empty sequence — "
-            "completion-only masking will fail"
+    collator = None
+    if _has_collator:
+        # TRL < 1.0: use explicit DataCollatorForCompletionOnlyLM
+        response_token_ids = tokenizer.encode(
+            response_template, add_special_tokens=False
         )
-    logger.info(
-        "Response template '%s' → %d token IDs: %s",
-        response_template.replace("\n", "\\n"),
-        len(response_token_ids),
-        response_token_ids,
-    )
-
-    collator = DataCollatorForCompletionOnlyLM(
-        response_template=response_template,
-        tokenizer=tokenizer,
-    )
-
-    # -- Validation gate: collator masks non-assistant tokens --
-    _val_sample = tokenizer.apply_chat_template(
-        dataset[0]["messages"], tokenize=False
-    )
-    _val_encoded = tokenizer(
-        _val_sample,
-        return_tensors="pt",
-        truncation=True,
-        max_length=sft_config.max_seq_length,
-    )
-    _val_batch = collator([{
-        "input_ids": _val_encoded["input_ids"][0],
-        "attention_mask": _val_encoded["attention_mask"][0],
-    }])
-    _val_labels = _val_batch["labels"][0]
-    n_masked = (_val_labels == -100).sum().item()
-    n_total = len(_val_labels)
-    n_trained = n_total - n_masked
-    if n_trained == 0:
-        raise ValueError(
-            "FATAL: collator masked ALL tokens — response template not found "
-            "in tokenized example. Check chat template compatibility."
-        )
-    mask_pct = 100.0 * n_masked / n_total
-    logger.info(
-        "Collator validation: %d/%d tokens masked (%.1f%%), "
-        "%d assistant tokens will receive loss",
-        n_masked, n_total, mask_pct, n_trained,
-    )
-    if mask_pct < 10.0:
-        logger.warning(
-            "Only %.1f%% of tokens masked — expected >50%% for "
-            "completion-only training. Check response template.",
-            mask_pct,
+        if len(response_token_ids) == 0:
+            raise ValueError(
+                "FATAL: response_template tokenises to empty sequence — "
+                "completion-only masking will fail"
+            )
+        logger.info(
+            "Response template '%s' → %d token IDs: %s",
+            response_template.replace("\n", "\\n"),
+            len(response_token_ids),
+            response_token_ids,
         )
 
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        train_dataset=dataset,
-        args=sft_config,
-        data_collator=collator,
-    )
+        collator = DataCollatorForCompletionOnlyLM(
+            response_template=response_template,
+            tokenizer=tokenizer,
+        )
+
+        # -- Validation gate: collator masks non-assistant tokens --
+        _val_sample = tokenizer.apply_chat_template(
+            dataset[0]["messages"], tokenize=False
+        )
+        _val_encoded = tokenizer(
+            _val_sample,
+            return_tensors="pt",
+            truncation=True,
+            max_length=sft_config.max_seq_length,
+        )
+        _val_batch = collator([{
+            "input_ids": _val_encoded["input_ids"][0],
+            "attention_mask": _val_encoded["attention_mask"][0],
+        }])
+        _val_labels = _val_batch["labels"][0]
+        n_masked = (_val_labels == -100).sum().item()
+        n_total = len(_val_labels)
+        n_trained = n_total - n_masked
+        if n_trained == 0:
+            raise ValueError(
+                "FATAL: collator masked ALL tokens — response template not found "
+                "in tokenized example. Check chat template compatibility."
+            )
+        mask_pct = 100.0 * n_masked / n_total
+        logger.info(
+            "Collator validation: %d/%d tokens masked (%.1f%%), "
+            "%d assistant tokens will receive loss",
+            n_masked, n_total, mask_pct, n_trained,
+        )
+    else:
+        # TRL >= 1.0: use SFTConfig completions_only flag
+        sft_config.completions_only = True
+        logger.info(
+            "Using TRL >= 1.0 completions_only=True (no explicit collator)"
+        )
+
+    trainer_kwargs = {
+        "model": model,
+        "tokenizer": tokenizer,
+        "train_dataset": dataset,
+        "args": sft_config,
+    }
+    if collator is not None:
+        trainer_kwargs["data_collator"] = collator
+
+    trainer = SFTTrainer(**trainer_kwargs)
 
     logger.info("Starting training …")
     train_result = trainer.train()
