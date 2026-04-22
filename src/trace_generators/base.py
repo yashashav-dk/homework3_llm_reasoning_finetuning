@@ -17,6 +17,23 @@ class CoTTrace:
 class BaseTraceGenerator(ABC):
     category: str  # subclass must set this
     max_tokens: int = 7680
+    _tokenizer = None
+    _tokenizer_available: bool | None = None
+
+    @classmethod
+    def _get_tokenizer(cls):
+        if cls._tokenizer_available is None:
+            try:
+                from transformers import AutoTokenizer
+
+                cls._tokenizer = AutoTokenizer.from_pretrained(
+                    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+                    trust_remote_code=True,
+                )
+                cls._tokenizer_available = True
+            except (ImportError, OSError):
+                cls._tokenizer_available = False
+        return cls._tokenizer
 
     @abstractmethod
     def generate_trace(self, puzzle: dict, solver_result: SolverResult) -> CoTTrace:
@@ -30,6 +47,9 @@ class BaseTraceGenerator(ABC):
         ...
 
     def count_tokens(self, text: str) -> int:
-        """Estimate token count. Override with tokenizer-based counting."""
-        # Rough estimate: 1 token per 4 chars
+        """Count tokens using the actual model tokenizer, with char-estimate fallback."""
+        tok = self._get_tokenizer()
+        if tok is not None:
+            return len(tok.encode(text, add_special_tokens=False))
+        # Fallback: ~1 token per 4 chars (conservative overcount is safer)
         return len(text) // 4

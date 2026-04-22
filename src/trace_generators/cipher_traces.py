@@ -188,7 +188,7 @@ class CipherTraceGenerator(BaseTraceGenerator):
         lines.append(f"Encrypted:  '{target_enc}'")
         lines.append(f"Decrypted:  '{decrypted_text}'")
         lines.append("")
-        lines.append(f"\\boxed{{{decrypted_text}}}")
+        lines.append(f"The answer is {decrypted_text}")
 
         thinking_text = "\n".join(lines)
 

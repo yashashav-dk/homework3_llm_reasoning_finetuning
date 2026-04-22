@@ -270,6 +270,45 @@ def main() -> None:
 
     _print_summary(counter)
 
+    # ------------------------------------------------------------------
+    # Validation gate
+    # ------------------------------------------------------------------
+    errors: list[str] = []
+
+    if len(records) == 0:
+        errors.append("FATAL: zero puzzles classified")
+
+    REQUIRED_CATEGORIES = {
+        "numeral", "gravity", "unit_conversion", "cipher", "bit_manipulation",
+    }
+    missing = REQUIRED_CATEGORIES - set(counter.keys())
+    if missing:
+        errors.append(f"FATAL: missing required categories: {missing}")
+
+    for cat, count in counter.items():
+        if count == 0:
+            errors.append(f"WARNING: category '{cat}' has 0 puzzles")
+
+    # Spot-check: every record has required fields
+    REQUIRED_FIELDS = {"id", "prompt", "answer", "category"}
+    for i, rec in enumerate(records[:100]):  # check first 100
+        missing_fields = REQUIRED_FIELDS - set(rec.keys())
+        if missing_fields:
+            errors.append(
+                f"Record {i} missing fields: {missing_fields}"
+            )
+            break
+
+    if errors:
+        print("\n=== VALIDATION FAILED ===")
+        for e in errors:
+            print(f"  {e}")
+        if any(e.startswith("FATAL") for e in errors):
+            sys.exit(1)
+    else:
+        print("\n=== VALIDATION PASSED ===")
+        print(f"  {len(records)} puzzles across {len(counter)} categories")
+
 
 if __name__ == '__main__':
     main()

@@ -97,8 +97,8 @@ def main() -> None:
     parser.add_argument(
         "--max-tokens",
         type=int,
-        default=7680,
-        help="Maximum token count filter (default: 7680)",
+        default=7200,
+        help="Maximum token count filter (default: 7200)",
     )
     parser.add_argument(
         "--categories",
@@ -188,6 +188,100 @@ def main() -> None:
         print(f"  median: {statistics.median(token_counts):.1f}")
         if len(token_counts) >= 2:
             print(f"  stdev:  {statistics.stdev(token_counts):.1f}")
+
+    # ------------------------------------------------------------------
+    # Validation gate
+    # ------------------------------------------------------------------
+    import sys
+
+    errors: list[str] = []
+
+    # Gate 1: minimum example count
+    MIN_EXAMPLES = 3000
+    if len(examples) < MIN_EXAMPLES:
+        errors.append(
+            f"FATAL: only {len(examples)} SFT examples "
+            f"(minimum {MIN_EXAMPLES})"
+        )
+
+    # Gate 2: at least 4 categories represented
+    if len(category_counts) < 4:
+        errors.append(
+            f"FATAL: only {len(category_counts)} categories in SFT data "
+            f"(need at least 4)"
+        )
+
+    # Gate 3: message structure validation (sample first 50)
+    for i, ex in enumerate(examples[:50]):
+        msgs = ex.get("messages", [])
+        if len(msgs) != 2:
+            errors.append(
+                f"FATAL: example {i} has {len(msgs)} messages (expected 2)"
+            )
+            break
+        if msgs[0].get("role") != "user":
+            errors.append(
+                f"FATAL: example {i} first message role is "
+                f"'{msgs[0].get('role')}' (expected 'user')"
+            )
+            break
+        if msgs[1].get("role") != "assistant":
+            errors.append(
+                f"FATAL: example {i} second message role is "
+                f"'{msgs[1].get('role')}' (expected 'assistant')"
+            )
+            break
+        assistant_content = msgs[1].get("content", "")
+        if "<think>" not in assistant_content:
+            errors.append(
+                f"WARNING: example {i} assistant content missing <think> tag"
+            )
+            break
+        if "\\boxed{" not in assistant_content:
+            errors.append(
+                f"WARNING: example {i} assistant content missing \\boxed{{}}"
+            )
+            break
+
+    # Gate 4: no duplicate puzzle IDs
+    seen_ids = set()
+    dup_count = 0
+    for ex in examples:
+        pid = ex.get("puzzle_id")
+        if pid in seen_ids:
+            dup_count += 1
+        seen_ids.add(pid)
+    if dup_count > 0:
+        errors.append(
+            f"WARNING: {dup_count} duplicate puzzle IDs in SFT data"
+        )
+
+    # Gate 5: output file is valid JSONL (re-read and parse first 5 lines)
+    with output_path.open("r", encoding="utf-8") as f:
+        for line_no, line in enumerate(f, 1):
+            if line_no > 5:
+                break
+            try:
+                json.loads(line)
+            except json.JSONDecodeError:
+                errors.append(
+                    f"FATAL: output line {line_no} is not valid JSON"
+                )
+                break
+
+    if errors:
+        print("\n=== VALIDATION FAILED ===")
+        for e in errors:
+            print(f"  {e}")
+        if any(e.startswith("FATAL") for e in errors):
+            sys.exit(1)
+    else:
+        print("\n=== VALIDATION PASSED ===")
+        print(
+            f"  {len(examples)} examples, "
+            f"{len(category_counts)} categories, "
+            f"{dup_count} duplicates"
+        )
 
 
 if __name__ == "__main__":

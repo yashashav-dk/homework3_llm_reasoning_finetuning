@@ -180,6 +180,17 @@ def _vocab_match(enc_word: str, mapping: dict[str, str]) -> str | None:
     return None
 
 
+def _vocab_complete(
+    partial: str, enc_word: str, mapping: dict[str, str]
+) -> str | None:
+    """Wrapper around _vocab_match used by trace generators.
+
+    Accepts (and ignores) the partial decryption string so trace generators
+    can pass it for context without breaking the call signature.
+    """
+    return _vocab_match(enc_word, mapping)
+
+
 def _decrypt_text(
     enc_text: str,
     mapping: dict[str, str],

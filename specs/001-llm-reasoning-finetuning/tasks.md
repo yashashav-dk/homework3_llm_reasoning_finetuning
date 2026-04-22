@@ -1,8 +1,9 @@
 # Tasks: LLM Reasoning Fine-Tuning Pipeline
 
 **Input**: Design documents from `/specs/001-llm-reasoning-finetuning/`
-**Prerequisites**: plan.md (rev 3), spec.md, deep-research.md, competition-reference.md
-**Revision**: 3 (solver-first architecture)
+**Prerequisites**: plan.md (rev 3), spec.md (clarified 2026-04-21), research.md, data-model.md, contracts/
+**Revision**: 4 (Colab Pro pipeline — aligned to revised plan)
+**Primary Platform**: Colab Pro L4 (24 GB VRAM)
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -16,13 +17,11 @@
 
 **Purpose**: Project initialization, directory structure, shared utilities
 
-- [X] T001 Create project directory structure per plan.md (src/solvers/, src/trace_generators/, src/data/, src/metrics/, src/utils/, experiments/configs/, experiments/results/, checkpoints/, submissions/, notebooks/, data/splits/, data/traces/, data/sft/)
-- [X] T002 Create requirements.txt with pinned dependencies (torch>=2.2.0, transformers>=4.45.0, peft>=0.12.0, trl>=0.12.0, vllm>=0.12.0, datasets>=3.0.0, accelerate>=1.0.0, bitsandbytes>=0.44.0, polars>=1.0.0)
-- [X] T003 [P] Implement seed management utility in src/utils/seeds.py (set PyTorch, NumPy, Python random seeds deterministically)
-- [X] T004 [P] Implement config loading and SHA256 hashing utility in src/utils/config.py (load YAML configs, compute config_hash)
-- [X] T005 [P] Implement experiment CSV logging utility in src/utils/logging.py (append-only experiment_log.csv with fields: run_id, config_hash, timestamp, hypothesis, treatment_variable, control_run_id, seed, categories_included, overall_accuracy, per_category_accuracy, decision)
-- [X] T006 Create initial experiment log CSV header in experiments/experiment_log.csv
-- [X] T007 Download competition train.csv to data/train.csv (from Kaggle competition data)
+- [X] T001 Create project directory structure per plan.md (src/solvers/, src/trace_generators/, src/data/, src/metrics/, src/utils/, experiments/configs/, checkpoints/, submissions/, notebooks/)
+- [X] T002 Create requirements.txt with pinned dependencies (torch>=2.2, transformers>=4.45, peft>=0.12, trl>=0.12, vllm>=0.12, datasets>=3.0, accelerate>=1.0, bitsandbytes>=0.44, polars>=1.0, pyyaml>=6.0)
+- [X] T003 [P] Implement seed management in src/utils/seeds.py
+- [X] T004 [P] Implement config loading and SHA256 hashing in src/utils/config.py
+- [X] T005 [P] Implement experiment CSV logging in src/utils/logging.py
 
 ---
 
@@ -30,142 +29,140 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story
 
-**CRITICAL**: No user story work can begin until this phase is complete
+- [X] T006 Implement competition metric (extract_final_answer + verify) in src/metrics/competition.py
+- [X] T007 Implement puzzle classifier (train.csv → 9 subcategories) in src/data/prepare.py
+- [X] T008 Implement stratified train/val split (90/10) in src/data/splits.py
+- [X] T009 Implement abstract solver interface in src/solvers/base.py
+- [X] T010 Implement abstract trace generator interface in src/trace_generators/base.py
+- [X] T011 Implement SFT formatter (ChatML + `<think>` + `\boxed{}`, validation gates) in src/data/format_sft.py
+- [X] T012 Implement vLLM evaluation pipeline in src/evaluate.py
+- [X] T013 Implement adapter packaging + validation in src/package.py
+- [X] T014 Implement QLoRA training with PEFT/TRL SFTTrainer in src/train.py
 
-- [X] T008 Implement exact competition metric in src/metrics/competition.py: `extract_final_answer()` (boxed extraction with fallback patterns) and `verify()` (binary strict match, numeric rel_tol=1e-2, string case-insensitive) — copy logic exactly from competition-reference.md
-- [X] T009 Implement puzzle category classifier in src/data/prepare.py (load train.csv, classify each row into: numeral, gravity, unit_conversion, cipher, bit_manipulation, equation_numeric_deduce, equation_numeric_guess, cryptarithm_deduce, cryptarithm_guess; output data/puzzles_classified.jsonl)
-- [X] T010 Implement train/validation split in src/data/splits.py (90/10 stratified by category, deterministic seed=42, output data/splits/train_ids.json and val_ids.json)
-- [X] T011 Implement abstract solver interface in src/solvers/base.py (BaseSolver with solve() and verify() methods per contracts/experiment-contract.md)
-- [X] T012 Implement abstract trace generator interface in src/trace_generators/base.py (BaseTraceGenerator with generate_trace() returning thinking_text + final_answer, token counting, 7680 limit check)
-- [X] T013 Implement SFT data formatter in src/data/format_sft.py (load traces, format as ChatML messages with `<think>...</think>` + `\boxed{}`, verify token count < 7680, output data/sft/train_sft.jsonl)
-- [X] T014 Implement evaluation pipeline in src/evaluate.py (load model via vLLM with competition params: temp=0.0, top_p=1.0, max_tokens=7680, max_model_len=8192, enable_thinking=True; run inference; score with competition metric; report per-category accuracy)
-- [X] T015 Implement adapter packaging in src/package.py (copy adapter_config.json + adapter_model.safetensors into submission.zip; validate rank<=32 and target_modules match regex)
-
-**Checkpoint**: Foundation ready — user story implementation can now begin
+**Checkpoint**: Foundation complete — all modules implemented
 
 ---
 
 ## Phase 3: User Story 1 — Baseline Evaluation (Priority: P1) MVP
 
-**Goal**: Establish measurable baseline accuracy of unmodified 30B model on competition puzzles
+**Goal**: Establish measurable baseline accuracy of unmodified model
 
-**Independent Test**: Run inference on validation split, produce per-category accuracy breakdown. Compare to submission demo baseline of 0.49.
+**Independent Test**: `python -m src.evaluate --split data/splits/val_ids.json` produces ~0.49
 
-- [X] T016 [US1] Run src/data/prepare.py to classify all 9500 train.csv puzzles into categories, output data/puzzles_classified.jsonl
-- [X] T017 [US1] Run src/data/splits.py to create frozen validation split at data/splits/ (10% holdout, stratified, seed=42)
-- [X] T018 [US1] Create baseline experiment config in experiments/configs/exp-001-baseline.yaml (model_name, seed=42, no adapter, competition eval params, prompt_template=none)
-- [ ] T019 [US1] Run src/evaluate.py with exp-001-baseline.yaml against validation split — record overall and per-category accuracy in experiments/results/exp-001-baseline.json
-- [ ] T020 [US1] Log exp-001-baseline results to experiments/experiment_log.csv (decision=adopt as baseline)
-- [ ] T021 [US1] Build error analysis notebook at notebooks/error_analysis.ipynb (per-category accuracy, error types: wrong answer, wrong binary format, no \boxed{}, truncation, empty response; sample errors per category)
+- [X] T015 [US1] Create baseline experiment config in experiments/configs/exp-001-baseline.yaml
+- [ ] T016 [US1] Run baseline evaluation on validation split, save results to experiments/results/exp-001-baseline.json
+- [ ] T017 [US1] Log baseline to experiments/experiment_log.csv
 
-**Checkpoint**: Baseline accuracy established (~0.49 expected). All subsequent experiments compare against this.
+**Checkpoint**: Baseline accuracy established (~0.49)
 
 ---
 
-## Phase 4: User Story 2 — Easy Category Solvers & Traces (Priority: P2)
+## Phase 4: User Story 2 — Solvers & Traces (Priority: P2)
 
-**Goal**: Write solvers and CoT trace generators for 4 easy categories achieving 100% solve rate = 66.8% accuracy floor
+**Goal**: Write solvers + trace generators for all 7 categories. Easy categories target 100%, hard categories target best achievable.
 
-**Independent Test**: Each solver verified 100% correct on train.csv for its category. CoT traces formatted as SFT data.
+**Independent Test**: Each solver verified on train.csv. Traces formatted as SFT data.
 
-### 4a. Roman Numeral (1576 samples, target: 100%)
+### 4a. Easy Category Solvers (100% solvable — 66.8% floor)
 
-- [X] T022 [P] [US2] Implement Roman numeral solver in src/solvers/numeral.py (enumerate all 1-100 Roman numerals, parse prompt examples, extract target, convert)
-- [X] T023 [P] [US2] Implement numeral trace generator in src/trace_generators/numeral_traces.py (step-by-step decomposition: thousands → hundreds → tens → ones → concatenation → \boxed{})
-- [X] T024 [US2] Verify numeral solver: 1576/1576 = 100%: run on all 1576 numeral puzzles in train.csv, assert 100% accuracy with competition metric
+- [X] T018 [P] [US2] Implement numeral solver in src/solvers/numeral.py
+- [X] T019 [P] [US2] Implement gravity solver in src/solvers/gravity.py
+- [X] T020 [P] [US2] Implement unit conversion solver in src/solvers/unit_conversion.py
+- [X] T021 [P] [US2] Implement cipher solver in src/solvers/cipher.py
 
-### 4b. Gravity (1597 samples, target: 100%)
+### 4b. Easy Category Trace Generators
 
-- [X] T025 [P] [US2] Implement gravity solver in src/solvers/gravity.py (parse examples to extract (t,d) pairs, derive rate=d/t^2, apply to target, format X.XX)
-- [X] T026 [P] [US2] Implement gravity trace generator in src/trace_generators/gravity_traces.py (rate-first decomposition, multi-step arithmetic, rate consistency verification against EX2, format to X.XX)
-- [X] T027 [US2] Verify gravity solver: 1597/1597 = 100%: run on all 1597 gravity puzzles, assert 100% accuracy
+- [X] T022 [P] [US2] Implement numeral trace generator in src/trace_generators/numeral_traces.py
+- [X] T023 [P] [US2] Implement gravity trace generator in src/trace_generators/gravity_traces.py
+- [X] T024 [P] [US2] Implement unit conversion trace generator in src/trace_generators/unit_conversion_traces.py
+- [X] T025 [P] [US2] Implement cipher trace generator in src/trace_generators/cipher_traces.py
 
-### 4c. Unit Conversion (1594 samples, target: 100%)
+### 4c. Hard Category Solvers
 
-- [X] T028 [P] [US2] Implement unit conversion solver in src/solvers/unit_conversion.py (derive factor=out/in from examples, apply factor*target, format X.XX)
-- [X] T029 [P] [US2] Implement unit conversion trace generator in src/trace_generators/unit_conversion_traces.py (rate derivation, multiplication steps, rate consistency check, format X.XX)
-- [X] T030 [US2] Verify unit conversion solver: 1594/1594 = 100%: run on all 1594 puzzles, assert 100% accuracy
+- [X] T026 [P] [US2] Implement bit manipulation solver (52 gate types, 5 levels) in src/solvers/bit_manipulation.py
+- [X] T027 [P] [US2] Implement equation solver (4 transforms × 32 operators) in src/solvers/equation.py
+- [X] T028 [P] [US2] Implement cryptarithm solver (concatenation detection, carry-free, brute-force) in src/solvers/cryptarithm.py
 
-### 4d. Cipher (1576 samples, target: 100%)
+### 4d. Hard Category Trace Generators
 
-- [X] T031 [P] [US2] Implement cipher solver in src/solvers/cipher.py (extract char mappings from example pairs, handle unmapped chars via vocabulary fill from ~90 Wonderland words)
-- [X] T032 [P] [US2] Implement cipher trace generator in src/trace_generators/cipher_traces.py (build mapping table, char-by-char decryption, vocabulary matching for gaps, verify decryption)
-- [X] T033 [US2] Verify cipher solver: 1576/1576 = 100%: run on all 1576 cipher puzzles, assert 100% accuracy
+- [X] T029 [P] [US2] Implement bit manipulation trace generator (bit-serial) in src/trace_generators/bit_manipulation_traces.py
+- [X] T030 [P] [US2] Implement equation trace generator in src/trace_generators/equation_traces.py
+- [X] T031 [P] [US2] Implement cryptarithm trace generator in src/trace_generators/cryptarithm_traces.py
 
-### Integration
-
-- [ ] T034 [US2] Generate all CoT traces for easy categories, save to data/traces/ (numeral_traces.jsonl, gravity_traces.jsonl, unit_conversion_traces.jsonl, cipher_traces.jsonl)
-- [ ] T035 [US2] Verify all traces fit within 7680 token limit using tokenizer token counting
-- [ ] T036 [US2] Run src/data/format_sft.py on easy category traces to produce data/sft/train_sft_easy.jsonl
-
-**Checkpoint**: 4 solvers verified 100% on train.csv. SFT data ready for 6343 puzzles.
+**Checkpoint**: All 7 solver + trace generator pairs implemented
 
 ---
 
-## Phase 5: User Story 3 — First SFT & Hard Solvers (Priority: P3)
+## Phase 5: User Story 3 — Colab Pipeline & Full SFT (Priority: P3)
 
-**Goal**: Train on easy traces, verify model learns, then add hard categories for ~0.85
+**Goal**: Fix data quality issues, build Colab notebook, run full SFT, evaluate
 
-**Independent Test**: Fine-tuned adapter exceeds baseline on validation split. Hard category solvers verified on train.csv.
+**Independent Test**: Fine-tuned adapter on val split exceeds baseline (>0.49). Notebook runs end-to-end on Colab Pro L4 within 2h.
 
-### 5a. First SFT on Easy Categories
+### 5a. Code Fixes (prerequisite for clean training data)
 
-- [X] T037 [US3] Create experiment config experiments/configs/exp-010-easy-sft.yaml (QLoRA r=32, lora_alpha=16, target_modules=`r".*\.(in_proj|out_proj|up_proj|down_proj)$"`, lr=2e-4, batch_size=4, grad_accum=8, max_seq_length=4096, epochs=1, seed=42, categories=numeral+gravity+unit_conversion+cipher)
-- [X] T038 [US3] Implement QLoRA training script in src/train.py (load 30B model in 4-bit via BitsAndBytesConfig nf4, apply LoRA via PEFT with config from YAML, train with TRL SFTTrainer on data/sft/train_sft_easy.jsonl, save adapter to checkpoints/)
-- [ ] T039 [US3] Run QLoRA training with exp-010-easy-sft.yaml, save adapter to checkpoints/exp-010-easy-sft/
-- [ ] T040 [US3] Evaluate exp-010 adapter on validation split with src/evaluate.py, log results, verify near-100% on easy categories (~0.67 overall)
-- [ ] T041 [US3] Package exp-010 adapter as submissions/submission-easy.zip, submit to Kaggle for first score
+> From the Colab Pro pipeline plan. These fixes land in `src/` and benefit
+> both Kaggle and Colab. Must be done before full SFT to avoid duplicate
+> `\boxed{}` in training data and OOM on L4.
 
-### 5b. Bit Manipulation Solver (1602 samples, target: 85%)
+- [X] T032 [P] [US3] Drop inline `\boxed{}` from thinking_text in src/trace_generators/numeral_traces.py:184
+- [X] T033 [P] [US3] Drop inline `\boxed{}` from thinking_text in src/trace_generators/gravity_traces.py:167
+- [X] T034 [P] [US3] Drop inline `\boxed{}` from thinking_text in src/trace_generators/cipher_traces.py:191
+- [X] T035 [P] [US3] Drop inline `\boxed{}` from thinking_text in src/trace_generators/cryptarithm_traces.py:296
+- [X] T036 [P] [US3] Drop inline `\boxed{}` from thinking_text in src/trace_generators/bit_manipulation_traces.py:263
+- [X] T037 [US3] Fix numeral CLI output keys in src/trace_generators/numeral_traces.py:251-252 — `"thinking"` → `"thinking_text"`, `"answer"` → `"final_answer"`
+- [X] T038 [US3] Lower default --max-tokens from 7680 to 7200 in src/data/format_sft.py:100
+- [X] T039 [US3] Add gradient_checkpointing pass-through in src/train.py SFTConfig (~line 172)
+- [X] T040 [US3] Add `gradient_checkpointing: true` in experiments/configs/exp-011-full-sft.yaml
 
-- [X] T042 [P] [US3] Implement bit manipulation solver in src/solvers/bit_manipulation.py (per-bit boolean function search through 52 gate types: Level 0 constants → Level 1 identity/NOT → Level 2 AND/OR/XOR/NAND/NOR/XNOR+4 negation variants → Level 3 MAJ/CHO/PAR3/AO/OA/AX/OX/XA/XO → Level 4 AOA/OAO/PAR4/XX/AXA; verify candidate against test input)
-- [X] T043 [P] [US3] Implement bit manipulation trace generator in src/trace_generators/bit_manipulation_traces.py (bit-serial gate computation: spell out each operation one bit at a time like `0&1=0 1&1=1`; include verification step)
-- [X] T044 [US3] Verify bit manipulation solver on train.csv: 960/1602 = 60% (target 85%, needs improvement)
+### 5b. Review Fixes (from code review audit)
 
-### 5c. Equation Solver (732 samples, target: 76-90%)
+- [X] T041 [US3] Add `trust_remote_code=True` to vLLM LLM() kwargs in src/evaluate.py:80
+- [X] T042 [US3] Add `max_lora_rank=32` to vLLM LLM() kwargs when loading adapter in src/evaluate.py:84
+- [X] T043 [US3] Fix misleading `overall_accuracy = train_loss` placeholder in src/train.py:353
 
-- [X] T045 [P] [US3] Implement equation solver in src/solvers/equation.py (4 operand transforms: AB_CD, BA_DC, AB_CD→YX, BA_DC→YX × 32 operators; frequency-ordered brute force scan; EX2 verification to catch coincidental matches)
-- [X] T046 [P] [US3] Implement equation trace generator in src/trace_generators/equation_traces.py (parse → scan → lock → apply → answer format)
-- [X] T047 [US3] Verify equation solver on train.csv: 309/687 = 45% (target 76-90%, needs more operations)
+### 5c. Colab Notebook
 
-### 5d. Cryptarithm Solver (823 samples, target: ~8%)
+- [X] T044 [US3] Create Colab orchestrator notebook at notebooks/colab_pipeline.ipynb (~12 cells, thin wrapper over `python -m src.*` CLIs, no Unsloth, no base64, no HF .generate())
+- [X] T045 [US3] Add `assert 'YOUR_USER' not in REPO_URL` guard in colab notebook cell 2
+- [X] T046 [US3] Add `assert os.path.exists('data/train.csv')` after Kaggle download in colab notebook cell 3
+- [X] T047 [US3] Update colab notebook VRAM figure from 22.5 GB to 24 GB
 
-- [X] T048 [P] [US3] Implement cryptarithm solver in src/solvers/cryptarithm.py (detect concatenation/reverse concatenation as baseline; accept low solve rate)
-- [X] T049 [P] [US3] Implement cryptarithm trace generator in src/trace_generators/cryptarithm_traces.py (traces for solvable subset only)
-- [X] T050 [US3] Verify cryptarithm solver on train.csv: 0/868 = 0% (puzzle format is symbol transformations, not traditional cryptarithm)
+### 5d. Verification
 
-### 5e. Full SFT with All Categories
+- [X] T048 [US3] Smoke-test imports on CPU: `python -c "from src.train import load_model_for_training; from src.data.format_sft import format_trace_to_sft"` — verify no ImportError
+- [X] T049 [US3] Spot-check SFT example: run `python -m src.data.format_sft --max-tokens 7200` on existing traces, grep first example's assistant content for `\boxed` — must appear exactly once, after `</think>` (RESULT: stale trace files have double boxed; fresh generation confirmed clean — T050 regen required)
 
-- [ ] T051 [US3] Generate all CoT traces for hard categories, save to data/traces/ (bit_manipulation_traces.jsonl, equation_traces.jsonl, cryptarithm_traces.jsonl)
-- [ ] T052 [US3] Run src/data/format_sft.py on all category traces to produce data/sft/train_sft_full.jsonl
-- [X] T053 [US3] Create experiment config experiments/configs/exp-011-full-sft.yaml (same QLoRA config, categories=all, treatment_variable=add_hard_categories, control_run_id=exp-010)
-- [ ] T054 [US3] Run QLoRA training with exp-011-full-sft.yaml, save adapter to checkpoints/exp-011-full-sft/
-- [ ] T055 [US3] Evaluate exp-011 adapter on validation split, log per-category accuracy, compare to exp-010 (~0.85 target)
+### 5e. Generate Data & Run Full SFT
 
-**Checkpoint**: Best SFT adapter with all categories. Per-category accuracy validated.
+- [X] T050 [US3] Generate all CoT traces for all categories (run solver + trace generator per category), save to data/traces/
+- [X] T051 [US3] Run `python -m src.data.format_sft --max-tokens 7200 --output data/sft/train_sft_full.jsonl` — verify validation passes
+- [ ] T052 [US3] Run full SFT on Colab Pro L4 via `python -m src.train --config experiments/configs/exp-011-full-sft.yaml` — watch for: collator mask 40-70%, loss finite, adapter files present
+- [ ] T053 [US3] Run evaluation via `python -m src.evaluate --adapter checkpoints/exp-011-full-sft --config experiments/configs/exp-011-full-sft.yaml --output experiments/results/exp-011.json` — target >0.49 overall
+- [ ] T054 [US3] End-to-end: run colab_pipeline.ipynb top-to-bottom on Colab Pro L4. Expected ~75-100 min total. Verify submission ZIP <200 MB.
+
+**Checkpoint**: Full SFT adapter trained and evaluated. Colab pipeline validated end-to-end.
 
 ---
 
 ## Phase 6: User Story 4 — Submission & Optimization (Priority: P4)
 
-**Goal**: Optimize adapter, submit best version to Kaggle
+**Goal**: Package best adapter, submit to Kaggle, optimize if needed
 
 **Independent Test**: submission.zip scores >= 0.85 on public leaderboard
 
-### 6a. Ablation & Optimization
+### 6a. Submit
 
-- [ ] T056 [US4] Inspect minimum logprob per trace from exp-011 training — identify weak spots (traces where model is least confident)
-- [ ] T057 [US4] Create experiment config experiments/configs/exp-012-trace-refinement.yaml (refine traces for categories with <100% accuracy, treatment_variable=trace_quality)
-- [ ] T058 [US4] Refine trace generators where model struggles (tokenization issues, arithmetic steps too complex, bit-serial ambiguities), regenerate traces, retrain
-- [ ] T059 [US4] Create experiment config experiments/configs/exp-013-lr-ablation.yaml (treatment_variable=learning_rate, try lr=1e-4 vs 2e-4)
-- [ ] T060 [US4] Run exp-013 training, evaluate, compare to exp-011
-- [ ] T061 [US4] Select best adapter based on validation accuracy, copy to checkpoints/best/
+- [ ] T055 [US4] Package adapter via `python -m src.package --adapter checkpoints/exp-011-full-sft --output submissions/exp-011.zip`
+- [ ] T056 [US4] Submit to Kaggle via `kaggle competitions submit`, record public score
+- [ ] T057 [US4] If accuracy < 0.85: proceed to ablation (T058+). If >= 0.85: skip to Polish (Phase 7).
 
-### 6b. Submission
+### 6b. Ablation & Optimization (conditional)
 
-- [ ] T062 [US4] Package best adapter as submissions/submission.zip using src/package.py (verify adapter_config.json has rank<=32 and correct target_modules)
-- [ ] T063 [US4] Submit submission.zip to Kaggle, record public score
-- [ ] T064 [US4] If accuracy < 0.85: iterate on trace quality for weakest categories; if >= 0.85: proceed to polish
+- [ ] T058 [P] [US4] Create experiment config for lr ablation (lr=1e-4) in experiments/configs/exp-012-lr-ablation.yaml
+- [ ] T059 [P] [US4] Create experiment config for batch_size=2 (safer L4 fit) in experiments/configs/exp-013-bs-ablation.yaml
+- [ ] T060 [US4] Run ablation experiments, evaluate, compare to exp-011
+- [ ] T061 [US4] Select best adapter, copy to checkpoints/best/
 
 **Checkpoint**: Competitive submission on Kaggle leaderboard.
 
@@ -173,14 +170,12 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-**Purpose**: Final optimization, documentation, second submission
+**Purpose**: Final optimization, documentation, deadline submissions
 
-- [ ] T065 [P] Try RL (GRPO) as optional ablation on best SFT adapter — only adopt if accuracy improves on validation split
-- [ ] T066 [P] Create public documentation notebook at notebooks/submission_demo.ipynb (document methods, solvers, trace design, training setup — required for prize eligibility)
-- [ ] T067 Update error_analysis.ipynb with final model comparison (baseline vs easy-SFT vs full-SFT vs best)
-- [ ] T068 Verify reproducibility: re-run best experiment from committed config with same seed, confirm identical results
-- [ ] T069 Select 2 final submissions for Kaggle (best overall + best on weakest category)
-- [ ] T070 Final commit: all configs, results, traces, and documentation
+- [ ] T062 [P] Optional: RL (GRPO) ablation on best SFT adapter — experiments/configs/exp-020-grpo.yaml
+- [ ] T063 [P] Create public documentation notebook (required for prizes) at notebooks/documentation.ipynb
+- [ ] T064 Verify reproducibility: re-run best experiment from config with same seed
+- [ ] T065 Select 2 final submissions, submit before June 15, 2026 deadline
 
 ---
 
@@ -188,80 +183,70 @@
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies — start immediately
-- **Foundational (Phase 2)**: Depends on Setup — BLOCKS all user stories
-- **US1 Baseline (Phase 3)**: Depends on Foundational
-- **US2 Easy Solvers (Phase 4)**: Can start after Foundational (independent of US1, but US1 provides comparison baseline)
-- **US3 SFT & Hard Solvers (Phase 5)**: Depends on US2 (needs easy traces for first SFT); hard solvers (T042-T050) can start in parallel with easy SFT (T037-T041)
-- **US4 Submission (Phase 6)**: Depends on US3 (needs best adapter)
-- **Polish (Phase 7)**: Depends on US4
+- **Phase 1 (Setup)**: No dependencies — start immediately
+- **Phase 2 (Foundational)**: Depends on Phase 1 — BLOCKS all user stories
+- **Phase 3 (US1 Baseline)**: Depends on Phase 2
+- **Phase 4 (US2 Solvers)**: Depends on Phase 2 (independent of US1)
+- **Phase 5 (US3 Colab + SFT)**: Code fixes (5a-5c) independent of Phases 3-4. Data generation (5e) depends on Phase 4 solvers + Phase 5a fixes.
+- **Phase 6 (US4 Submission)**: Depends on Phase 5 full SFT
+- **Phase 7 (Polish)**: Depends on Phase 6
 
 ### Parallel Opportunities
 
-**Phase 1 (Setup)**:
-```text
-Parallel: T003, T004, T005 (independent utility modules)
+**Phase 2**: T006-T014 touch different files — many can run in parallel
+
+**Phase 4**: All solver pairs are independent:
+```
+Parallel: T018+T022, T019+T023, T020+T024, T021+T025 (easy)
+Parallel: T026+T029, T027+T030, T028+T031 (hard)
 ```
 
-**Phase 4 (Easy Solvers)**:
-```text
-Parallel: T022+T023 (numeral), T025+T026 (gravity), T028+T029 (unit), T031+T032 (cipher)
-— All 4 solver+trace pairs are independent of each other
-```
+**Phase 5a**: T032-T036 all touch different trace generator files — fully parallel
 
-**Phase 5 (Hard Solvers — while easy SFT trains)**:
-```text
-Parallel: T042+T043 (bit_manip), T045+T046 (equation), T048+T049 (cryptarithm)
-— All 3 hard solver pairs can run alongside T039 (easy SFT training)
-```
+**Phase 5b**: T041-T043 touch different files (evaluate.py, train.py) — parallel
 
-**Phase 7 (Polish)**:
-```text
-Parallel: T065 (RL ablation), T066 (documentation notebook)
-```
+**Phase 6b**: T058, T059 are independent config files — parallel
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (US1 Only)
+### Colab Pro Path (current focus)
 
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational
-3. Complete Phase 3: US1 Baseline Evaluation
-4. **STOP and VALIDATE**: Baseline accuracy confirmed (~0.49)
+All code is implemented. Remaining work is data generation + training + eval:
 
-### Fast Path to First Score
-
-1. Setup + Foundational + US1 Baseline → ~0.49
-2. US2 Easy Solvers → 4 verified solvers at 100%
-3. US3 First SFT (easy only) → first submission ~0.67
-4. **Submit to Kaggle** — validate pipeline works end-to-end
-
-### Full Path to Competitive Score
-
-1. US3 Hard Solvers → bit_manip (85%), equation (80%), cryptarithm (8%)
-2. US3 Full SFT → ~0.85 on validation
-3. US4 Ablation & Optimization → squeeze final gains
-4. Submit best adapter → target 0.85+ on leaderboard
+1. **Verify fixes** (T048-T049) — CPU smoke tests
+2. **Generate data** (T050-T051) — run solvers + traces + format SFT
+3. **Train on Colab L4** (T052) — ~25-35 min with gradient checkpointing
+4. **Evaluate with vLLM** (T053) — ~15-25 min after freeing training model
+5. **End-to-end notebook run** (T054) — full validation
+6. **Package + submit** (T055-T056)
 
 ### Critical Path
 
-```text
-T001-T007 → T008-T015 → T016-T021 → T022-T036 → T037-T055 → T062-T064
-(Setup)     (Foundation) (Baseline)  (Solvers)    (SFT+Hard)  (Submit)
 ```
+T048-T049 → T050-T051 → T052 → T053 → T054 → T055-T056
+(verify)    (data gen)   (train) (eval)  (e2e)  (submit)
+```
+
+### What NOT to do (lessons from Kaggle)
+
+- No Unsloth — use plain transformers + peft + bitsandbytes
+- No base64-embedding of src/ — clone the repo
+- No HF .generate() for eval — use src/evaluate.py with vLLM
+- No reimplementing train.py/evaluate.py in notebook cells
+- No hardcoded hyperparams in notebooks — use YAML configs
 
 ---
 
 ## Notes
 
-- [P] tasks = different files, no dependencies
+- [P] tasks = different files, no dependencies on incomplete tasks
 - [Story] label maps task to specific user story
-- Solvers are CPU-only Python — no GPU needed until training (T039)
-- Each solver MUST be verified 100% (easy) or to expected rate (hard) on train.csv before generating traces
-- All traces MUST fit within 7680 token limit
-- All evaluation MUST use competition params (temp=0, enable_thinking=True)
-- Commit config + results after each experiment per constitution
+- Competition deadline: 2026-06-15
+- Primary GPU: Colab Pro L4 (24 GB GDDR6). Kaggle G4 (96 GB) is fallback.
+- Training requires gradient_checkpointing=true on L4
+- Effective token budget: 7200 (reserves ~480 tokens for prompt overhead vs competition max 7680)
 - LoRA rank MUST be <= 32, target_modules: `in_proj|out_proj|up_proj|down_proj`
-- Winner's public traces (Nemotron-cot-Tong dataset) available as reference/fallback
+- lora_alpha=16 with r=32 gives scaling ratio 0.5 (from official demo — consider testing alpha=32 or 64)
+- per_device_train_batch_size=4 may OOM on L4 with max_seq_length=7680 — if so, try batch_size=2 (T059)

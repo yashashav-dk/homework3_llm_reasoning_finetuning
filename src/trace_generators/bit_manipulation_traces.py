@@ -260,7 +260,7 @@ class BitManipulationTraceGenerator(BaseTraceGenerator):
         lines.append(bit_listing)
         lines.append(f"\n  Concatenated: {''.join(output_bits)}")
         lines.append("")
-        lines.append(f"\\boxed{{{predicted}}}")
+        lines.append(f"The answer is {predicted}")
 
         thinking_text = "\n".join(lines)
 

@@ -164,7 +164,7 @@ class GravityTraceGenerator(BaseTraceGenerator):
             f"  Rounding to exactly two decimal places: {answer:.4f} → {answer_str}"
         )
         lines.append("")
-        lines.append(f"\\boxed{{{answer_str}}}")
+        lines.append(f"The answer is {answer_str}")
 
         thinking_text = "\n".join(lines)
 

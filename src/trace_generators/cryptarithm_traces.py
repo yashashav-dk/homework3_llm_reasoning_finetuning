@@ -293,7 +293,7 @@ class CryptarithmTraceGenerator(BaseTraceGenerator):
             lines.append(f"Answer: {solver_result.predicted_answer}")
 
         lines.append("")
-        lines.append(f"\\boxed{{{solver_result.predicted_answer}}}")
+        lines.append(f"The answer is {solver_result.predicted_answer}")
 
         thinking_text = "\n".join(lines)
 

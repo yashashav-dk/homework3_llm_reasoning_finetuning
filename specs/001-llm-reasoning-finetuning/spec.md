@@ -22,6 +22,14 @@
 - Q: How should the local validation split be constructed? → A: Hold out 5% of OpenMathReasoning problems stratified by difficulty before training. Provides same-distribution ground truth for accurate accuracy measurement with competition metric.
 - Q: Should the plan include an RL stage after SFT? → A: SFT first, then RL (GRPO/DPO) as optional ablation experiment. Validate SFT gains before adding RL complexity per constitution principle III (iterative experimentation).
 
+### Session 2026-04-21
+
+- Q: Should spec include Colab Pro L4 as target platform? → A: Colab Pro L4 (24 GB VRAM) is now the primary training/eval platform. Kaggle G4 VM is secondary/fallback.
+- Q: How to document token budget vs competition limit? → A: Competition max_tokens=7680 (fixed). Effective training budget=7200 (accounts for ~130-345 tokens of prompt + chat template overhead not in trace token_count).
+- Q: Should pipeline support checkpoint resumption for Colab timeouts? → A: No. Training is ~30 min (well within session limits). Chrome keep-alive plugin prevents idle disconnect. Full restart is acceptable.
+- Q: Should equation.py ZeroDivisionError and package.py .bin fallback bugs be scoped? → A: Explicitly deferred / out-of-scope for this iteration. File separately.
+- Q: Time constraint for training + eval on Colab Pro L4? → A: Within 2h total. Training ~30 min (unverified estimate for L4, measure on first run), vLLM eval ~15-25 min (also unverified). 2h provides safe headroom.
+
 ### Session 2026-04-16 (from competition metric source & model card)
 
 - Correction: Numerical tolerance in metric verify() is 1e-2 (not
@@ -111,9 +119,9 @@ prompt-only variant on local validation split.
 **Acceptance Scenarios**:
 
 1. **Given** train.csv formatted with thinking traces, **When** QLoRA
-   fine-tuning (rank<=32, target: in_proj|out_proj|up_proj|down_proj)
-   completes on G4 VM, **Then** training finishes within 12h with
-   logged metrics
+   fine-tuning (rank<=32, target: in_proj|out_proj|up_proj|down_proj,
+   gradient_checkpointing=true) completes on Colab Pro L4, **Then**
+   training + evaluation finishes within 2h with logged metrics
 2. **Given** fine-tuned adapter, **When** evaluated on local split
    with `enable_thinking=True`, **Then** accuracy exceeds prompt-only
    baseline
@@ -148,9 +156,19 @@ competition parameters and produces \boxed{} answers.
 - LoRA adapter exceeds rank 32 limit
 - Model fails to produce \boxed{} answers consistently
 - Thinking traces consume most of the 7680 max_tokens budget, leaving
-  insufficient room for the final answer
+  insufficient room for the final answer. Effective training budget is
+  7200 tokens (trace token_count) to reserve ~480 tokens for prompt +
+  chat template overhead that the competition adds at inference time
 - Train.csv puzzle formats vary across types (bit manipulation vs
   encryption vs algebraic) — model must generalize
+
+### Deferred (Out-of-Scope This Iteration)
+
+- equation.py ZeroDivisionError when operand transform produces zero
+  denominator — low frequency, does not affect training pipeline
+- package.py `.bin` fallback — `train.py` already handles
+  `.safetensors` vs `.bin` detection; `package.py` does not need it
+  for the Colab pipeline path
 
 ## Requirements
 
@@ -164,7 +182,8 @@ competition parameters and produces \boxed{} answers.
 - **FR-003**: System MUST support configurable prompt templates
 - **FR-004**: System MUST fine-tune with QLoRA (4-bit base + bf16
   LoRA, rank <= 32, target modules: `in_proj|out_proj|up_proj|
-  down_proj`) within G4 VM memory constraints
+  down_proj`) within Colab Pro L4 memory constraints (24 GB VRAM,
+  gradient_checkpointing=true)
 - **FR-005**: System MUST produce answers in \boxed{} LaTeX format
 - **FR-006**: System MUST package LoRA adapter as submission.zip with
   adapter_config.json
@@ -206,9 +225,18 @@ competition parameters and produces \boxed{} answers.
 
 ## Assumptions
 
-- Kaggle G4 VM with RTX PRO 6000 is available for all runs
+- Colab Pro L4 (24 GB GDDR6 VRAM; ~20.4 GB usable at
+  gpu_memory_utilization=0.85) is the primary training and evaluation
+  platform. Requires gradient_checkpointing=true and careful VRAM
+  management (free training model before vLLM eval). Kaggle G4 VM
+  (96 GB) is available as fallback.
 - Nemotron-3-Nano-30B (30B MoE, 3.5B active) fits in GPU memory for
-  inference (~60GB bf16) and QLoRA training (~24GB) on 96GB VRAM
+  QLoRA training (~17.5 GB 4-bit base + LoRA + optimizer with gradient
+  checkpointing) on L4 24 GB. vLLM inference requires freeing training
+  model first.
+- Training + evaluation completes within 2h on Colab Pro L4. Estimated
+  ~30 min training + ~20 min vLLM eval (unverified for L4 — measure
+  on first run).
 - train.csv (9500 samples, CC-BY-4.0) is sufficient as primary
   training data for domain-specific fine-tuning
 - OpenMathReasoning (CC-BY-4.0) is useful for general reasoning

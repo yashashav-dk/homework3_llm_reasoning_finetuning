@@ -77,9 +77,11 @@ def run_inference(
         "model": model_name,
         "max_model_len": 8192,
         "gpu_memory_utilization": 0.85,
+        "trust_remote_code": True,
     }
     if adapter_path is not None:
         llm_kwargs["enable_lora"] = True
+        llm_kwargs["max_lora_rank"] = 32
 
     llm = LLM(**llm_kwargs)
 

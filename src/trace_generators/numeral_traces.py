@@ -181,7 +181,7 @@ class NumeralTraceGenerator(BaseTraceGenerator):
         # Step 5: Final answer
         lines.append("")
         lines.append("Step 5: State the final answer.")
-        lines.append(f"The answer is \\boxed{{{answer}}}")
+        lines.append(f"The answer is {answer}")
 
         thinking_text = "\n".join(lines)
 
@@ -248,8 +248,8 @@ if __name__ == "__main__":
             record = {
                 "puzzle_id": trace.puzzle_id,
                 "category": trace.category,
-                "thinking": trace.thinking_text,
-                "answer": trace.final_answer,
+                "thinking_text": trace.thinking_text,
+                "final_answer": trace.final_answer,
                 "token_count": trace.token_count,
                 "is_verified": trace.is_verified,
             }
