@@ -35,7 +35,7 @@ training:
   warmup_ratio: 0.03
   bf16: true
   logging_steps: 10
-  gradient_checkpointing: false
+  gradient_checkpointing: true
   save_strategy: epoch
 
 eval:
