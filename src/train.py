@@ -258,9 +258,13 @@ def train(config: dict) -> dict:
             "Using TRL >= 1.0 completions_only=True (no explicit collator)"
         )
 
+    # TRL >= 1.0 renamed 'tokenizer' → 'processing_class'
+    _trainer_params = inspect.signature(SFTTrainer.__init__).parameters
+    tok_key = "tokenizer" if "tokenizer" in _trainer_params else "processing_class"
+
     trainer_kwargs = {
         "model": model,
-        "tokenizer": tokenizer,
+        tok_key: tokenizer,
         "train_dataset": dataset,
         "args": sft_config,
     }
